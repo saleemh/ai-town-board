@@ -1,0 +1,20 @@
+[
+  {
+    "filename": "agenda.pdf",
+    "download_url": "REPLACE_WITH_ACTUAL_AGENDA_URL",
+    "document_type": "agenda",
+    "notes": "Right-click Agenda button, inspect element, find href or data-url"
+  },
+  {
+    "filename": "minutes.pdf",
+    "download_url": "REPLACE_WITH_ACTUAL_MINUTES_URL",
+    "document_type": "minutes",
+    "notes": "Right-click Minutes button, inspect element, find href or data-url"
+  },
+  {
+    "filename": "packet.pdf",
+    "download_url": "REPLACE_WITH_ACTUAL_PACKET_URL",
+    "document_type": "packet",
+    "notes": "Right-click Packet button, inspect element, find href or data-url"
+  }
+]

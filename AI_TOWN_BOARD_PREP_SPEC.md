@@ -2,14 +2,14 @@
 
 ## Project Overview
 
-The AI Town Board Prep System is a comprehensive solution for automated collection, processing, and analysis of town board meeting materials. The system leverages AI agents with specialized expertise to provide pre-meeting analysis and insights.
+The AI Town Board Prep System is a focused solution for intelligent processing and analysis of town board meeting documents. The system processes user-provided PDFs using advanced AI to generate insights and analysis from specialized AI agents.
 
 ### Key Objectives
-1. **Automated Data Collection**: Programmatically collect all meeting materials from the North Castle board portal
-2. **Document Processing**: Convert PDFs and images to searchable markdown using IBM Docling
-3. **AI Analysis**: Deploy specialized AI agents to analyze agenda items with domain expertise
-4. **Extensible Architecture**: Support addition of new agent types with minimal code changes
-5. **Data Organization**: Maintain well-structured data storage for historical reference and analysis
+1. **Document Processing**: Convert user-provided PDFs to searchable markdown using IBM Docling
+2. **AI Analysis**: Deploy specialized AI agents to analyze meeting content with domain expertise
+3. **Extensible Architecture**: Support addition of new agent types with minimal code changes
+4. **Data Organization**: Maintain well-structured data storage for historical reference and analysis
+5. **Simplified Workflow**: Focus on processing and analysis rather than document collection
 
 ## System Architecture
 
@@ -17,17 +17,18 @@ The AI Town Board Prep System is a comprehensive solution for automated collecti
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Orchestration Engine                         │
+│                    Processing Engine                             │
 ├─────────────────────────────────────────────────────────────────┤
-│  Data Collector  │  Document Processor  │    Agent Framework   │
-│                  │                      │                      │
-│  • Board Portal  │  • IBM Docling       │  • Town Attorney     │
-│  • Authentication│  • PDF → Markdown    │  • Future Agents     │
-│  • File Download │  • OCR Processing    │  • Plugin System     │
+│  Document Processor      │         Agent Framework              │
+│                          │                                      │
+│  • IBM Docling           │  • Town Attorney                     │
+│  • PDF → Markdown        │  • Future Agents                     │
+│  • OCR Processing        │  • Plugin System                     │
+│  • Table Extraction      │  • Analysis Generation               │
 ├─────────────────────────────────────────────────────────────────┤
 │                    Data Storage Layer                           │
-│  • Meeting Data  │  • Town Code        │  • Agent Analysis    │
-│  • File Management • Version Control   │  • Metadata Store    │
+│  • Meeting Data   │  • Processed Content  │  • Agent Analysis  │
+│  • File Management • Metadata Store      │  • Historical Data  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 

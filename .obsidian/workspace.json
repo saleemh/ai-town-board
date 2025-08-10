@@ -11,12 +11,10 @@
             "id": "af9fe24cdad32853",
             "type": "leaf",
             "state": {
-              "type": "pdf",
-              "state": {
-                "file": "data/meetings/2025-08-13-regular/originals/agendas.pdf"
-              },
-              "icon": "lucide-file-text",
-              "title": "agendas"
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
             }
           }
         ]
@@ -169,12 +167,17 @@
   },
   "active": "af9fe24cdad32853",
   "lastOpenFiles": [
-    "test_urls.py",
-    "debug_page.html",
-    "data/meetings/2025-08-13-regular/originals/minutes.pdf",
-    "data/meetings/2025-08-13-regular/originals/agendas.pdf",
-    "AI_TOWN_BOARD_PREP_SPEC.md",
-    "src/collectors/auth_manager.py",
-    "src/collectors/board_portal_collector.py"
+    "README.md.tmp.81371.1754864251536",
+    "README.md.tmp.81371.1754864242075",
+    "README.md.tmp.81371.1754864228130",
+    "README.md.tmp.81371.1754864206025",
+    "README.md.tmp.81371.1754864193343",
+    "README.md.tmp.81371.1754864172181",
+    "config/config.yaml.tmp.81371.1754864137580",
+    "src/__main__.py.tmp.81371.1754864093354",
+    "src/__main__.py.tmp.81371.1754864083854",
+    "src/__main__.py.tmp.81371.1754864063594",
+    "manual_documents_2025-08-13.json",
+    "AI_TOWN_BOARD_PREP_SPEC.md"
   ]
 }
