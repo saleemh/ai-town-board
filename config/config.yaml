@@ -1,0 +1,41 @@
+# AI Town Board Prep System Configuration
+
+board_portal:
+  base_url: "https://northcastleny.boardportal.civicclerk.com"
+  login_url: "https://cpauthentication.civicplus.com"
+  credentials_file: "config/board_portal_creds.json"  # encrypted
+  timeout: 30
+  retry_attempts: 3
+  
+document_processing:
+  docling:
+    ocr_enabled: true
+    table_extraction: true
+    image_processing: true
+    output_format: "markdown"
+    batch_size: 5
+    
+agents:
+  town_attorney:
+    enabled: true
+    llm_provider: "openai"  # or "anthropic"
+    model: "gpt-4"
+    temperature: 0.1
+    max_tokens: 2000
+    
+town_code:
+  source_url: "https://ecode360.com/NO0492"
+  update_check_interval: "weekly"
+  search_index_rebuild: "monthly"
+  scraping_delay: 2  # seconds between requests
+  
+storage:
+  data_directory: "./data"
+  backup_enabled: true
+  retention_policy: "2_years"
+  
+logging:
+  level: "INFO"
+  file: "logs/ai_town_board.log"
+  max_size_mb: 50
+  backup_count: 5

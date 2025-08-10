@@ -1,0 +1,39 @@
+# AI Town Board Prep System Requirements
+
+# Core dependencies
+python-dotenv>=1.0.0
+requests>=2.31.0
+httpx>=0.25.0
+aiofiles>=23.0.0
+asyncio-throttle>=1.0.2
+
+# Document processing
+docling>=1.0.0
+
+# Web scraping
+beautifulsoup4>=4.12.0
+selenium>=4.15.0
+civic-scraper>=0.1.0
+
+# AI/LLM integration
+openai>=1.0.0
+anthropic>=0.7.0
+
+# Data processing
+pandas>=2.0.0
+pydantic>=2.0.0
+jsonschema>=4.17.0
+
+# Configuration
+pyyaml>=6.0.0
+click>=8.1.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.11.0
+
+# Development
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.5.0

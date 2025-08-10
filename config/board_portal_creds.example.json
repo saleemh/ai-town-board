@@ -1,0 +1,5 @@
+{
+  "username": "your-email@example.com",
+  "password": "your-password",
+  "note": "Copy this file to board_portal_creds.json and update with your actual North Castle board portal credentials. The actual credentials file is ignored by git for security."
+}
