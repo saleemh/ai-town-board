@@ -178,6 +178,119 @@ def test_auth(ctx):
 
 
 @cli.command()
+@click.option('--limit', default=20, help='Maximum number of meetings to show')
+@click.option('--debug', is_flag=True, help='Show debug information about page structure')
+@click.pass_context
+def list_meetings(ctx, limit, debug):
+    """List available meetings from the board portal."""
+    config = ctx.obj['config']
+    
+    click.echo("🔍 Discovering available meetings...")
+    
+    async def run_discovery():
+        async with BoardPortalCollector(config) as collector:
+            try:
+                if debug:
+                    # Debug mode - show page structure
+                    await collector._ensure_authenticated()
+                    agendas_url = f"{collector.base_url}/Agendas"
+                    response = await collector.client.get(agendas_url)
+                    
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    
+                    click.echo(f"\n🔍 Debug: Page structure analysis")
+                    click.echo(f"URL: {agendas_url}")
+                    click.echo(f"Status: {response.status_code}")
+                    
+                    # Show all links on the page
+                    links = soup.find_all('a', href=True)
+                    click.echo(f"\nFound {len(links)} links on the page:")
+                    
+                    for i, link in enumerate(links[:50]):  # Show first 50 links
+                        href = link.get('href', '')
+                        text = link.get_text().strip()[:100]  # Truncate long text
+                        if text:  # Only show links with text
+                            click.echo(f"  {i+1:2d}. {text}")
+                            click.echo(f"      → {href}")
+                    
+                    if len(links) > 50:
+                        click.echo(f"... and {len(links) - 50} more links")
+                    
+                    # Look for other elements that might contain meeting data
+                    click.echo(f"\n🔍 Looking for other content...")
+                    
+                    # Look for table rows, divs with data, etc.
+                    tables = soup.find_all('table')
+                    click.echo(f"Tables found: {len(tables)}")
+                    
+                    divs_with_data = soup.find_all('div', {'data-date': True}) + soup.find_all('div', {'data-meeting': True})
+                    click.echo(f"Divs with data attributes: {len(divs_with_data)}")
+                    
+                    # Look for script tags that might contain meeting data
+                    scripts = soup.find_all('script')
+                    click.echo(f"Script tags: {len(scripts)}")
+                    
+                    for script in scripts:
+                        if script.string and ('meeting' in script.string.lower() or 'agenda' in script.string.lower()):
+                            click.echo(f"  Found script with meeting/agenda content (first 200 chars):")
+                            click.echo(f"  {script.string[:200]}...")
+                    
+                    # Show raw HTML sample
+                    click.echo(f"\n🔍 Raw HTML sample (first 1000 chars):")
+                    click.echo(response.text[:1000])
+                    
+                    return
+                
+                meetings = await collector.discover_available_meetings()
+                
+                if not meetings:
+                    click.echo("No meetings found on the board portal.")
+                    click.echo("\n💡 Try running with --debug to see page structure:")
+                    click.echo("   python -m src list-meetings --debug")
+                    return
+                    
+                # Limit results
+                meetings = meetings[:limit]
+                
+                click.echo(f"\n📅 Found {len(meetings)} meetings:\n")
+                
+                for i, meeting in enumerate(meetings, 1):
+                    # Format date nicely
+                    from datetime import datetime
+                    try:
+                        date_obj = datetime.strptime(meeting['date'], '%Y-%m-%d')
+                        formatted_date = date_obj.strftime('%B %d, %Y')
+                    except:
+                        formatted_date = meeting['date']
+                    
+                    # Meeting type badge
+                    type_badges = {
+                        'regular': '📋',
+                        'special': '⚡',
+                        'workshop': '🛠️',
+                        'public_hearing': '🎤',
+                        'budget': '💰'
+                    }
+                    badge = type_badges.get(meeting['type'], '📋')
+                    
+                    click.echo(f"{i:2d}. {badge} {formatted_date} ({meeting['type']})")
+                    click.echo(f"    {meeting['title']}")
+                    click.echo(f"    📋 {meeting['date']}")
+                    click.echo("")
+                    
+                click.echo("💡 To collect documents for a specific meeting, use:")
+                click.echo("   python -m src collect --date YYYY-MM-DD")
+                    
+            except Exception as e:
+                click.echo(f"❌ Failed to discover meetings: {e}")
+                sys.exit(1)
+    
+    # Run the async discovery
+    asyncio.run(run_discovery())
+
+
+@cli.command()
 @click.pass_context
 def status(ctx):
     """Show system status and configuration."""

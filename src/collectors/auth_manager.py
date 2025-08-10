@@ -50,11 +50,16 @@ class AuthManager:
             # Step 1: Get initial login page to capture state/nonce
             auth_params = await self._get_auth_parameters(client)
             
-            # Step 2: Perform OAuth2 authorization
-            auth_code = await self._perform_oauth_login(client, auth_params)
-            
-            # Step 3: Exchange code for tokens (handled automatically by redirect)
-            success = await self._verify_authentication(client)
+            # Check if already authenticated
+            if auth_params.get('already_authenticated'):
+                logger.info("User is already authenticated")
+                success = True
+            else:
+                # Step 2: Perform OAuth2 authorization
+                auth_code = await self._perform_oauth_login(client, auth_params)
+                
+                # Step 3: Exchange code for tokens (handled automatically by redirect)
+                success = await self._verify_authentication(client)
             
             if success:
                 logger.info("Authentication successful")
@@ -113,7 +118,7 @@ class AuthManager:
             client: HTTP client to use
             
         Returns:
-            Dictionary with auth parameters (state, nonce, etc.)
+            Dictionary with auth parameters (state, nonce, etc.) and login_url
         """
         logger.debug("Getting authentication parameters")
         
@@ -131,11 +136,18 @@ class AuthManager:
                        'response_mode', 'nonce', 'state']:
                 if key in query_params:
                     auth_params[key] = query_params[key][0]
+            
+            # Store the login URL for later use        
+            auth_params['login_url'] = str(response.url)
                     
             logger.debug(f"Extracted auth parameters: {list(auth_params.keys())}")
             return auth_params
+        elif response.status_code == 200:
+            # We're already authenticated - no redirect needed
+            logger.info("Already authenticated - no redirect to CivicPlus detected")
+            return {'already_authenticated': True}
         else:
-            raise Exception("Expected redirect to CivicPlus authentication not found")
+            raise Exception(f"Unexpected authentication response: {response.status_code} at {response.url}")
             
     async def _perform_oauth_login(
         self, 
@@ -153,8 +165,12 @@ class AuthManager:
         """
         logger.debug("Performing OAuth2 login")
         
-        # Get the login form
-        login_response = await client.get(client.url)
+        # Get the login page using the URL from auth_params
+        login_url = auth_params.get('login_url')
+        if not login_url:
+            raise Exception("Login URL not found in auth parameters")
+            
+        login_response = await client.get(login_url)
         soup = BeautifulSoup(login_response.text, 'html.parser')
         
         # Find the login form
@@ -173,33 +189,106 @@ class AuthManager:
             if name:
                 form_data[name] = value
                 
-        # Add credentials
-        form_data['Username'] = self.credentials['username']  # May need adjustment
-        form_data['Password'] = self.credentials['password']  # May need adjustment
+        # Add credentials - first let's debug what form fields exist
+        logger.debug("Available form fields:")
+        for input_field in login_form.find_all('input'):
+            field_name = input_field.get('name', 'NO_NAME')
+            field_type = input_field.get('type', 'NO_TYPE')
+            logger.debug(f"  {field_name} ({field_type})")
+            
+        # Try common username/password field names
+        username_field = None
+        password_field = None
         
-        # Submit login form
-        login_url = urljoin(str(client.url), form_action) if form_action else str(client.url)
+        # Look for username field
+        for input_field in login_form.find_all('input'):
+            field_name = input_field.get('name', '').lower()
+            field_type = input_field.get('type', '').lower()
+            if 'email' in field_name or 'username' in field_name or (field_type == 'email'):
+                username_field = input_field.get('name')
+                break
+        
+        # Look for password field  
+        for input_field in login_form.find_all('input', type='password'):
+            password_field = input_field.get('name')
+            break
+            
+        if not username_field or not password_field:
+            raise Exception(f"Could not find username/password fields. Username: {username_field}, Password: {password_field}")
+            
+        form_data[username_field] = self.credentials['username']
+        form_data[password_field] = self.credentials['password']
+        
+        logger.debug(f"Using fields - Username: {username_field}, Password: {password_field}")
+        
+        # Submit login form  
+        submit_url = urljoin(login_url, form_action) if form_action else login_url
         
         response = await client.post(
-            login_url,
+            submit_url,
             data=form_data,
             headers={
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'Referer': str(client.url)
+                'Referer': login_url
             }
         )
         
-        # Check for successful authentication
-        if response.status_code == 200 and 'error' not in response.text.lower():
-            # Extract authorization code if present
+        logger.debug(f"Login response status: {response.status_code}")
+        logger.debug(f"Login response URL: {response.url}")
+        logger.debug(f"Response headers: {dict(response.headers)}")
+        
+        # Check for successful authentication - could be redirect or form post
+        if response.status_code in [200, 302]:
+            # Check URL for authorization code
             if 'code=' in str(response.url):
                 parsed = urlparse(str(response.url))
                 code_params = parse_qs(parsed.query)
                 if 'code' in code_params:
+                    logger.info("Authorization code found in URL")
                     return code_params['code'][0]
+            
+            # Check for redirect to callback with authorization code
+            if response.status_code == 302:
+                location = response.headers.get('Location', '')
+                if 'code=' in location:
+                    parsed = urlparse(location)
+                    code_params = parse_qs(parsed.query)
+                    if 'code' in code_params:
+                        logger.info("Authorization code found in redirect location")
+                        return code_params['code'][0]
+            
+            # Check response body for form post with code
+            if 'code' in response.text:
+                # Look for form post response with authorization code
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # Find the form that will post to redirect_uri
+                oauth_form = soup.find('form')
+                if oauth_form:
+                    form_action = oauth_form.get('action')
+                    form_data = {}
+                    
+                    # Extract all form fields including code and id_token
+                    for input_field in oauth_form.find_all('input'):
+                        name = input_field.get('name')
+                        value = input_field.get('value', '')
+                        if name:
+                            form_data[name] = value
+                    
+                    if 'code' in form_data:
+                        logger.info("Found authorization code, completing OAuth flow")
+                        
+                        # Submit the form to complete the OAuth flow
+                        if form_action:
+                            oauth_response = await client.post(form_action, data=form_data)
+                            logger.debug(f"OAuth completion response: {oauth_response.status_code}")
+                            logger.debug(f"OAuth completion URL: {oauth_response.url}")
+                        
+                        return form_data['code']
                     
         # If we get here, login likely failed
         self._check_for_login_errors(response.text)
+        logger.debug(f"Response text sample: {response.text[:500]}...")
         raise Exception("OAuth2 login failed - no authorization code received")
         
     def _check_for_login_errors(self, response_text: str):
@@ -232,27 +321,36 @@ class AuthManager:
         logger.debug("Verifying authentication status")
         
         try:
+            # Wait a moment for OAuth flow to complete
+            import asyncio
+            await asyncio.sleep(1)
+            
             # Try to access a protected page
             response = await client.get(self.base_url + '/Agendas')
             
+            logger.debug(f"Verification response status: {response.status_code}")
+            logger.debug(f"Verification response URL: {response.url}")
+            
             # Check for signs of successful authentication
             if response.status_code == 200:
-                # Look for user-specific content or lack of login prompts
-                soup = BeautifulSoup(response.text, 'html.parser')
-                
-                # Check for user name or logout link (adjust selectors as needed)
-                user_indicators = [
-                    soup.find(string=re.compile(self.credentials['username'], re.I)),
-                    soup.find('a', href=re.compile('logout', re.I)),
-                    soup.find('span', class_=re.compile('user', re.I))
-                ]
-                
-                if any(user_indicators):
-                    return True
-                    
                 # Check that we're not being redirected to login
                 if 'cpauthentication.civicplus.com' not in str(response.url):
+                    logger.info("Authentication verification successful - no redirect to auth")
                     return True
+                else:
+                    logger.debug("Still being redirected to authentication")
+                    return False
+                    
+            # Check for redirects
+            elif response.status_code in [302, 301]:
+                location = response.headers.get('Location', '')
+                logger.debug(f"Redirect location: {location}")
+                if 'cpauthentication.civicplus.com' not in location:
+                    logger.info("Authentication verification successful - redirect to internal page")  
+                    return True
+                else:
+                    logger.debug("Being redirected back to authentication")
+                    return False
                     
             return False
             
