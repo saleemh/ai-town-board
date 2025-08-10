@@ -48,8 +48,12 @@ Automated collection and AI-powered analysis of North Castle town board meeting 
 | `python -m src status` | Show system configuration | ✅ Working |
 | `python -m src test-auth` | Test board portal authentication | ✅ Working |
 | `python -m src list-meetings` | List available meetings from portal | ✅ Working |
-| `python -m src collect --date YYYY-MM-DD` | Collect documents for specific date | ✅ Working |
-| `python -m src collect-range --start DATE --end DATE` | Collect date range | ✅ Working |
+| `python -m src collect --date YYYY-MM-DD` | Collect documents for specific date | ⚠️ Partial* |
+| `python -m src collect-range --start DATE --end DATE` | Collect date range | ⚠️ Partial* |
+| `python -m src inspect-meeting --date YYYY-MM-DD` | Manual document URL inspection guide | ✅ Working |
+| `python -m src collect-manual --date YYYY-MM-DD` | Collect using manual URLs | ✅ Working |
+
+**\* Note**: Automatic document collection is partially working. The system can authenticate and find meetings, but the document download URLs require manual inspection due to JavaScript-based portal behavior.
 
 Currently creates this structure when collecting meetings:
 
@@ -151,6 +155,29 @@ originals/  markdown/  analysis/  metadata.json
 $ ls data/meetings/2025-08-04-regular/originals/
 agendas.pdf  minutes.pdf  attachments/
 ```
+
+## 🔧 Troubleshooting Document Collection
+
+**If `collect` downloads corrupt PDFs or HTML files:**
+
+1. **Use the manual inspection workflow:**
+   ```bash
+   python -m src inspect-meeting --date 2025-08-13
+   # Opens browser and provides step-by-step guide
+   ```
+
+2. **Right-click document buttons in browser:**
+   - Look for "Agenda", "Minutes", "Packet" buttons
+   - Right-click → "Inspect Element" 
+   - Find the actual download URL in href, data-url, or onclick attributes
+
+3. **Create manual document file and collect:**
+   ```bash
+   # Create manual_documents_2025-08-13.json with actual URLs
+   python -m src collect-manual --date 2025-08-13
+   ```
+
+4. **Share working URLs:** Once you find working URLs, share them so we can fix the automatic detection!
 
 ## 📋 Next Steps
 

@@ -50,13 +50,20 @@ class DocumentDetector:
             soup = BeautifulSoup(response.text, 'html.parser')
             documents = []
             
-            # Find all downloadable links
-            download_links = self._find_download_links(soup)
+            # TEMPORARY FIX: Instead of returning navigation links, let's try to find the 
+            # actual PDF download patterns that work for this specific portal
+            documents = await self._discover_civicclerk_documents(client, meeting_url, soup)
             
-            for link in download_links:
-                doc_info = self._extract_document_info(link, meeting_url)
-                if doc_info:
-                    documents.append(doc_info)
+            if not documents:
+                # Fall back to the old method if new method doesn't work
+                download_links = self._find_download_links(soup)
+                
+                for link in download_links:
+                    doc_info = self._extract_document_info(link, meeting_url)
+                    if doc_info:
+                        # CRITICAL FIX: Don't add documents that point to HTML pages
+                        if self._is_valid_document_url(doc_info['download_url']):
+                            documents.append(doc_info)
                     
             logger.info(f"Found {len(documents)} documents")
             return documents
@@ -284,3 +291,298 @@ class DocumentDetector:
             return int(size_value * multipliers.get(size_unit, 1))
             
         return None
+        
+    async def _discover_civicclerk_documents(
+        self, 
+        client: httpx.AsyncClient, 
+        meeting_url: str, 
+        soup: BeautifulSoup
+    ) -> List[Dict]:
+        """Discover documents using CivicClerk-specific patterns.
+        
+        This method attempts to find the actual PDF download URLs instead of 
+        navigation page links.
+        
+        Args:
+            client: HTTP client
+            meeting_url: Meeting page URL
+            soup: Parsed HTML
+            
+        Returns:
+            List of document dictionaries
+        """
+        documents = []
+        
+        # Extract date from meeting URL (format: ?date=YYYY-MM-DD)
+        import re
+        from urllib.parse import urlparse, parse_qs
+        
+        parsed_url = urlparse(meeting_url)
+        query_params = parse_qs(parsed_url.query)
+        meeting_date = query_params.get('date', [None])[0]
+        
+        if not meeting_date:
+            logger.warning("Could not extract meeting date from URL")
+            return documents
+            
+        logger.debug(f"Searching for documents for meeting date: {meeting_date}")
+        
+        # First, try to find document IDs or session-specific URLs in the HTML/JavaScript
+        documents_from_page = self._extract_document_ids_from_page(soup, meeting_date)
+        if documents_from_page:
+            return documents_from_page
+        
+        # Try common CivicClerk document endpoint patterns with date variations
+        base_url = self.base_url
+        
+        # Try different date formats that might work
+        date_formats = [
+            meeting_date,  # 2025-08-13
+            meeting_date.replace('-', '/'),  # 2025/08/13
+            meeting_date.replace('-', ''),   # 20250813
+        ]
+        
+        potential_endpoints = []
+        for date_fmt in date_formats:
+            potential_endpoints.extend([
+                # Direct PDF patterns
+                f"/Agendas/GetAgenda/{date_fmt}",
+                f"/Minutes/GetMinutes/{date_fmt}",
+                f"/Documents/GetPacket/{date_fmt}",
+                f"/Documents/GetAgenda/{date_fmt}",
+                f"/Documents/GetMinutes/{date_fmt}",
+                # API patterns
+                f"/API/Documents/{date_fmt}/agenda/download",
+                f"/API/Documents/{date_fmt}/minutes/download", 
+                f"/API/Documents/{date_fmt}/packet/download",
+                f"/API/Meetings/{date_fmt}/agenda",
+                f"/API/Meetings/{date_fmt}/minutes",
+                f"/API/Meetings/{date_fmt}/packet",
+                # File serving patterns
+                f"/Files/Meeting/{date_fmt}/agenda.pdf",
+                f"/Files/Meeting/{date_fmt}/minutes.pdf",
+                f"/Files/Meeting/{date_fmt}/packet.pdf",
+                # Alternative patterns
+                f"/Documents/{date_fmt}/agenda.pdf",
+                f"/Documents/{date_fmt}/minutes.pdf",
+                f"/Documents/{date_fmt}/packet.pdf",
+                f"/Download/{date_fmt}/agenda",
+                f"/Download/{date_fmt}/minutes",
+                f"/Download/{date_fmt}/packet",
+            ])
+        
+        for endpoint in potential_endpoints:
+            try:
+                test_url = base_url + endpoint
+                logger.debug(f"Testing document endpoint: {test_url}")
+                
+                response = await client.get(test_url)
+                
+                # Check if this returned a PDF or valid document
+                if (response.status_code == 200 and 
+                    len(response.content) > 1000 and
+                    self._looks_like_pdf(response)):
+                    
+                    # Determine document type from endpoint
+                    doc_type = 'document'
+                    filename = 'document.pdf'
+                    
+                    if 'agenda' in endpoint.lower():
+                        doc_type = 'agenda'
+                        filename = 'agenda.pdf'
+                    elif 'minutes' in endpoint.lower():
+                        doc_type = 'minutes' 
+                        filename = 'minutes.pdf'
+                    elif 'packet' in endpoint.lower():
+                        doc_type = 'packet'
+                        filename = 'packet.pdf'
+                        
+                    doc_info = {
+                        'filename': filename,
+                        'download_url': test_url,
+                        'document_type': doc_type,
+                        'link_text': f'{doc_type.title()} Document',
+                        'file_size': len(response.content),
+                        'processed': False
+                    }
+                    
+                    documents.append(doc_info)
+                    logger.info(f"Found {doc_type} document: {test_url} ({len(response.content)} bytes)")
+                    
+            except Exception as e:
+                logger.debug(f"Endpoint {endpoint} failed: {e}")
+                continue
+                
+        return documents
+        
+    def _looks_like_pdf(self, response) -> bool:
+        """Check if HTTP response looks like a PDF file.
+        
+        Args:
+            response: HTTP response object
+            
+        Returns:
+            True if response appears to be a PDF
+        """
+        content_type = response.headers.get('content-type', '').lower()
+        
+        # Check content type
+        if 'application/pdf' in content_type:
+            return True
+            
+        # Check if content starts with PDF magic bytes
+        if response.content.startswith(b'%PDF'):
+            return True
+            
+        # Check if it's NOT HTML (our main problem)
+        if 'text/html' in content_type:
+            return False
+            
+        # If content is substantial and not HTML, could be a PDF
+        if len(response.content) > 1000 and not response.content.startswith(b'<!DOCTYPE'):
+            return True
+            
+        return False
+        
+    def _is_valid_document_url(self, url: str) -> bool:
+        """Check if URL appears to be a valid document download URL.
+        
+        Args:
+            url: URL to validate
+            
+        Returns:
+            True if URL appears to be a document download
+        """
+        url_lower = url.lower()
+        
+        # Check for obvious PDF URLs
+        if '.pdf' in url_lower:
+            return True
+            
+        # Reject navigation page URLs
+        navigation_patterns = [
+            '/agendas$',
+            '/minutes$', 
+            '/documents$',
+            '/agendas/$',
+            '/minutes/$',
+            '/documents/$'
+        ]
+        
+        for pattern in navigation_patterns:
+            if re.search(pattern, url_lower):
+                return False
+                
+        # Accept URLs that look like document endpoints
+        document_patterns = [
+            'download',
+            'getdocument',
+            'getfile',
+            'pdf',
+            'attachment'
+        ]
+        
+        return any(pattern in url_lower for pattern in document_patterns)
+        
+    def _extract_document_ids_from_page(self, soup: BeautifulSoup, meeting_date: str) -> List[Dict]:
+        """Try to extract document IDs or URLs from JavaScript/HTML content.
+        
+        Args:
+            soup: Parsed HTML content
+            meeting_date: Meeting date string
+            
+        Returns:
+            List of document dictionaries found in page content
+        """
+        documents = []
+        
+        # Look for JavaScript variables that might contain document info
+        scripts = soup.find_all('script')
+        
+        for script in scripts:
+            if not script.string:
+                continue
+                
+            script_content = script.string
+            
+            # Look for common patterns that might indicate document URLs or IDs
+            patterns_to_search = [
+                # Look for URL patterns in JavaScript
+                r'"(/[^"]*(?:agenda|minutes|packet)[^"]*\.pdf)"',
+                r"'(/[^']*(?:agenda|minutes|packet)[^']*\.pdf)'",
+                # Look for object IDs that might be used to construct URLs
+                r'agenda_object_id["\']?\s*:\s*["\']?(\d+)',
+                r'document_id["\']?\s*:\s*["\']?(\d+)',
+                r'meeting_id["\']?\s*:\s*["\']?(\d+)',
+                # Look for download functions or endpoints
+                r'download[^(]*\([^)]*["\']([^"\']*(?:agenda|minutes|packet)[^"\']*)',
+            ]
+            
+            for pattern in patterns_to_search:
+                matches = re.findall(pattern, script_content, re.IGNORECASE)
+                
+                for match in matches:
+                    # Try to construct a document info from this match
+                    if match.startswith('/'):
+                        # This looks like a URL path
+                        full_url = self.base_url + match
+                        doc_type = self._classify_document_type(match, match)
+                        filename = f"{doc_type}.pdf"
+                        
+                        doc_info = {
+                            'filename': filename,
+                            'download_url': full_url,
+                            'document_type': doc_type,
+                            'link_text': f'{doc_type.title()} (from JS)',
+                            'file_size': None,
+                            'processed': False
+                        }
+                        documents.append(doc_info)
+                        logger.info(f"Found document URL in JavaScript: {full_url}")
+                        
+                    elif match.isdigit():
+                        # This might be a document ID - try common URL patterns with this ID
+                        doc_id = match
+                        potential_urls = [
+                            f"/Documents/Download/{doc_id}",
+                            f"/API/Documents/{doc_id}/download",
+                            f"/Agendas/Download/{doc_id}",
+                            f"/Minutes/Download/{doc_id}",
+                        ]
+                        
+                        # We'd need to test these URLs, but for now just log them
+                        logger.debug(f"Found potential document ID: {doc_id}")
+                        
+        # Look for data attributes in HTML elements that might contain document info
+        elements_with_data = soup.find_all(attrs={"data-url": True})
+        elements_with_data += soup.find_all(attrs={"data-download": True})
+        elements_with_data += soup.find_all(attrs={"data-document-id": True})
+        
+        for element in elements_with_data:
+            for attr_name, attr_value in element.attrs.items():
+                if attr_name.startswith('data-') and isinstance(attr_value, str):
+                    if any(word in attr_value.lower() for word in ['agenda', 'minutes', 'packet', 'download']):
+                        logger.debug(f"Found data attribute {attr_name}='{attr_value}' that might be document-related")
+                        
+                        if attr_value.startswith('/') or attr_value.startswith('http'):
+                            # This could be a document URL
+                            if attr_value.startswith('/'):
+                                full_url = self.base_url + attr_value
+                            else:
+                                full_url = attr_value
+                                
+                            doc_type = self._classify_document_type(attr_value, element.get_text())
+                            filename = f"{doc_type}.pdf"
+                            
+                            doc_info = {
+                                'filename': filename,
+                                'download_url': full_url,
+                                'document_type': doc_type,
+                                'link_text': f'{doc_type.title()} (from data attr)',
+                                'file_size': None,
+                                'processed': False
+                            }
+                            documents.append(doc_info)
+                            logger.info(f"Found document URL in data attribute: {full_url}")
+        
+        return documents

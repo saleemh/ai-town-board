@@ -291,6 +291,147 @@ def list_meetings(ctx, limit, debug):
 
 
 @cli.command()
+@click.option('--date', required=True, help='Meeting date in YYYY-MM-DD format')
+@click.pass_context
+def inspect_meeting(ctx, date):
+    """Open meeting page in browser and show manual document collection guide."""
+    config = ctx.obj['config']
+    
+    meeting_url = f"{config['board_portal']['base_url']}/Agendas?date={date}"
+    
+    click.echo(f"🔍 Manual Document Collection Guide for {date}")
+    click.echo(f"════════════════════════════════════════════════")
+    click.echo(f"")
+    click.echo(f"1. 🌐 Open this URL in your browser:")
+    click.echo(f"   {meeting_url}")
+    click.echo(f"")
+    click.echo(f"2. 📋 You should see buttons like 'Agenda', 'Minutes', 'Packet'")
+    click.echo(f"")
+    click.echo(f"3. 🔧 For each document button:")
+    click.echo(f"   - Right-click the button → 'Inspect Element'")
+    click.echo(f"   - Look for href, data-url, or onclick attributes")
+    click.echo(f"   - Note the actual download URL")
+    click.echo(f"")
+    click.echo(f"4. 📝 Create a file: manual_documents_{date}.json with:")
+    click.echo(f'   [')
+    click.echo(f'     {{')
+    click.echo(f'       "filename": "agenda.pdf",')
+    click.echo(f'       "download_url": "https://northcastleny.boardportal.civicclerk.com/ACTUAL_AGENDA_URL",')
+    click.echo(f'       "document_type": "agenda"')
+    click.echo(f'     }},')
+    click.echo(f'     {{')
+    click.echo(f'       "filename": "minutes.pdf",')
+    click.echo(f'       "download_url": "https://northcastleny.boardportal.civicclerk.com/ACTUAL_MINUTES_URL",')
+    click.echo(f'       "document_type": "minutes"')
+    click.echo(f'     }},')
+    click.echo(f'     {{')
+    click.echo(f'       "filename": "packet.pdf",')
+    click.echo(f'       "download_url": "https://northcastleny.boardportal.civicclerk.com/ACTUAL_PACKET_URL",')
+    click.echo(f'       "document_type": "packet"')
+    click.echo(f'     }}')
+    click.echo(f'   ]')
+    click.echo(f"")
+    click.echo(f"5. 🚀 Run: python -m src collect-manual --date {date}")
+    click.echo(f"")
+    click.echo(f"💡 This will help us reverse-engineer the correct URL patterns!")
+    
+    # Try to open in browser (works on macOS)
+    try:
+        import subprocess
+        subprocess.run(['open', meeting_url], check=False)
+        click.echo(f"✅ Opened in browser automatically")
+    except:
+        click.echo(f"ℹ️  Please manually open the URL above")
+
+@cli.command() 
+@click.option('--date', required=True, help='Meeting date in YYYY-MM-DD format')
+@click.pass_context
+def collect_manual(ctx, date):
+    """Collect documents using manually specified URLs."""
+    config = ctx.obj['config']
+    
+    manual_file = f"manual_documents_{date}.json"
+    
+    if not Path(manual_file).exists():
+        click.echo(f"❌ Manual document file not found: {manual_file}")
+        click.echo(f"Run: python -m src inspect-meeting --date {date}")
+        return
+    
+    click.echo(f"📄 Collecting documents using manual URLs from {manual_file}")
+    
+    async def collect_manually():
+        async with BoardPortalCollector(config) as collector:
+            try:
+                # Load manual document URLs
+                import json
+                with open(manual_file, 'r') as f:
+                    documents = json.load(f)
+                
+                # Ensure authenticated
+                await collector._ensure_authenticated()
+                
+                # Setup directory
+                meeting_dir = collector._setup_meeting_directory(date)
+                
+                # Download each document
+                results = []
+                for doc in documents:
+                    click.echo(f"📥 Downloading {doc['filename']}...")
+                    
+                    response = await collector.client.get(doc['download_url'])
+                    if response.status_code == 200:
+                        # Check if it's actually a PDF
+                        if response.content.startswith(b'%PDF'):
+                            file_path = meeting_dir / 'originals' / doc['filename']
+                            with open(file_path, 'wb') as f:
+                                f.write(response.content)
+                            
+                            click.echo(f"  ✅ {doc['filename']} ({len(response.content)} bytes)")
+                            doc['download_status'] = 'success'
+                            doc['file_path'] = str(file_path)
+                            doc['file_size'] = len(response.content)
+                        else:
+                            click.echo(f"  ❌ {doc['filename']} - Not a valid PDF (got HTML)")
+                            doc['download_status'] = 'invalid_content'
+                    else:
+                        click.echo(f"  ❌ {doc['filename']} - HTTP {response.status_code}")
+                        doc['download_status'] = 'http_error'
+                        doc['http_status'] = response.status_code
+                    
+                    results.append(doc)
+                
+                # Save metadata
+                metadata = {
+                    'meeting_date': date,
+                    'meeting_type': 'regular',
+                    'collection_timestamp': datetime.utcnow().isoformat() + 'Z',
+                    'board_portal_url': f"{config['board_portal']['base_url']}/Agendas?date={date}",
+                    'documents': results,
+                    'collection_method': 'manual_urls',
+                    'status': 'completed'
+                }
+                
+                metadata_file = meeting_dir / 'metadata.json'
+                with open(metadata_file, 'w') as f:
+                    json.dump(metadata, f, indent=2)
+                
+                successful = sum(1 for d in results if d.get('download_status') == 'success')
+                click.echo(f"")
+                click.echo(f"✅ Manual collection complete: {successful}/{len(documents)} documents successful")
+                
+                if successful > 0:
+                    click.echo(f"📁 Files saved to: {meeting_dir}")
+                    click.echo(f"")
+                    click.echo(f"🔧 Next: Share these working URLs so we can fix the automatic detection!")
+                
+            except Exception as e:
+                click.echo(f"❌ Manual collection failed: {e}")
+                
+    from datetime import datetime
+    asyncio.run(collect_manually())
+
+
+@cli.command()
 @click.pass_context
 def status(ctx):
     """Show system status and configuration."""

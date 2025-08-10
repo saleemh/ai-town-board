@@ -92,7 +92,7 @@ class BoardPortalCollector:
             # Check if already collected and not refreshing
             if not refresh and self._is_already_collected(meeting_dir):
                 logger.info(f"Meeting {meeting_date} already collected. Use --refresh to update.")
-                return self._load_existing_metadata(meeting_dir)
+                return await self._load_existing_metadata(meeting_dir)
             
             # Authenticate and get session
             await self._ensure_authenticated()

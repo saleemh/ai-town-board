@@ -11,14 +11,12 @@
             "id": "af9fe24cdad32853",
             "type": "leaf",
             "state": {
-              "type": "markdown",
+              "type": "pdf",
               "state": {
-                "file": "AI_TOWN_BOARD_PREP_SPEC.md",
-                "mode": "source",
-                "source": false
+                "file": "data/meetings/2025-08-13-regular/originals/agendas.pdf"
               },
-              "icon": "lucide-file",
-              "title": "AI_TOWN_BOARD_PREP_SPEC"
+              "icon": "lucide-file-text",
+              "title": "agendas"
             }
           }
         ]
@@ -171,6 +169,11 @@
   },
   "active": "af9fe24cdad32853",
   "lastOpenFiles": [
+    "test_urls.py",
+    "debug_page.html",
+    "data/meetings/2025-08-13-regular/originals/minutes.pdf",
+    "data/meetings/2025-08-13-regular/originals/agendas.pdf",
+    "AI_TOWN_BOARD_PREP_SPEC.md",
     "src/collectors/auth_manager.py",
     "src/collectors/board_portal_collector.py"
   ]
