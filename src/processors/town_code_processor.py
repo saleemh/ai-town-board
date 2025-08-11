@@ -633,7 +633,7 @@ class TownCodeProcessor(UniversalDocumentProcessor):
 ## Document Information
 - **Source**: {segment.source_path.name}
 - **Pages**: {segment.start_page}-{segment.end_page}
-- **PDF Segment**: {segment_filename}
+- **PDF Segment**: [[{Path(segment_filename).stem}]]
 - **Processing**: IBM Docling (Full Document Copy)
 
 ---

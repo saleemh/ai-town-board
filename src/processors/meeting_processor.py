@@ -308,9 +308,9 @@ class MeetingDocumentProcessor(UniversalDocumentProcessor):
         header = f"""# {segment.title}
 
 ## Document Information
-- **Source**: {segment.source_path.name}
+- **Source**: [[{segment.source_path.stem}]]
 - **Pages**: {segment.start_page}-{segment.end_page}
-- **PDF Segment**: {segment_filename}
+- **PDF Segment**: [[{Path(segment_filename).stem}]]
 - **Processing**: IBM Docling (Meeting Document)
 - **Document Type**: {segment.metadata.get('document_type', 'Meeting Document')}
 
@@ -358,17 +358,20 @@ class MeetingDocumentProcessor(UniversalDocumentProcessor):
         
         doc_type = segment.metadata.get('document_type', 'Meeting Document')
         
+        # Create Obsidian-compatible PDF link
+        pdf_name_no_ext = segment.source_path.stem  # Remove .pdf extension for Obsidian linking
+        
         header = f"""# {segment.title}
 
 ## Meeting Document Context
 - **Document Type**: {doc_type}
-- **Source File**: {segment.source_path.name}
+- **Source File**: [[{pdf_name_no_ext}]]
 - **Page Range**: {segment.start_page}-{segment.end_page} ({segment.end_page - segment.start_page + 1} pages)
 - **Processing**: IBM Docling with OCR
 - **Segment Type**: {segment.segment_type.title()}
 
 ## Navigation
-- **Source Document**: {segment.source_path.name}
+- **Source Document**: [[{pdf_name_no_ext}]]
 - **Processing Date**: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}
 
 ---
@@ -397,7 +400,7 @@ class MeetingDocumentProcessor(UniversalDocumentProcessor):
         markdown_content = f"""# {segment.title}
 
 **Meeting Document Information:**
-- Source: {segment.source_path.name}
+- Source: [[{segment.source_path.stem}]]
 - Pages: {segment.start_page}-{segment.end_page}
 - Type: {segment.segment_type}
 - Document Type: {segment.metadata.get('document_type', 'Meeting Document')}
@@ -470,7 +473,8 @@ class MeetingDocumentProcessor(UniversalDocumentProcessor):
             
             if len(docs) == 1:
                 doc = docs[0]
-                content += f"- **File**: [{doc['filename']}]({doc['filename']})\n"
+                filename_no_ext = Path(doc['filename']).stem
+                content += f"- **File**: [[{filename_no_ext}]]\n"
                 if 'page_count' in doc:
                     content += f"- **Pages**: {doc['page_count']}\n"
                 if 'document_type' in doc:
@@ -478,7 +482,8 @@ class MeetingDocumentProcessor(UniversalDocumentProcessor):
             else:
                 content += f"**Segments**: {len(docs)}\n\n"
                 for doc in docs:
-                    content += f"- [{doc['filename']}]({doc['filename']}) - {doc.get('segment_title', 'Untitled')}\n"
+                    filename_no_ext = Path(doc['filename']).stem
+                    content += f"- [[{filename_no_ext}]] - {doc.get('segment_title', 'Untitled')}\n"
                     if 'page_range' in doc:
                         content += f"  - Pages: {doc['page_range']}\n"
             

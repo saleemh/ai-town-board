@@ -310,7 +310,7 @@ class UniversalDocumentProcessor(ABC):
                 raise Exception("No content extracted from document")
             
             # Add document header with metadata including PDF reference
-            pdf_reference = segment_pdf_path.name if permanent_pdf_dir else "temporary segment"
+            pdf_reference = f"[[{segment_pdf_path.stem}]]" if permanent_pdf_dir else "temporary segment"
             
             header = f"""# {segment.title}
 
