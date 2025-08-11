@@ -14,6 +14,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).parent))
 
 from processors.document_processor import DocumentProcessor
+from processors.town_code_processor import TownCodeProcessor
 
 
 def setup_logging(level: str = "INFO"):
@@ -195,6 +196,92 @@ def status(ctx):
                 click.echo(f"  💡 Run 'python -m src process-all' to convert PDFs to Markdown")
     else:
         click.echo("  📁 Data directory will be created on first use")
+
+
+@cli.command()
+@click.option('--pdf-path', help='Path to town code PDF (default: data/town-code/originals/)')
+@click.option('--force', is_flag=True, help='Reprocess existing files')
+@click.pass_context
+def ingest_town_code(ctx, pdf_path, force):
+    """Process municipal code PDF into chapter-based markdown files."""
+    config = ctx.obj['config']
+    
+    # Determine PDF path
+    if pdf_path:
+        pdf_file_path = Path(pdf_path)
+    else:
+        data_dir = Path(config['storage']['data_directory'])
+        pdf_dir = data_dir / 'town-code' / 'originals'
+        
+        if not pdf_dir.exists():
+            click.echo(f"❌ Town code directory not found: {pdf_dir}")
+            click.echo("Please place the town code PDF in the expected location:")
+            click.echo(f"  {pdf_dir}/")
+            sys.exit(1)
+        
+        # Find PDF files in directory
+        pdf_files = list(pdf_dir.glob('*.pdf'))
+        if not pdf_files:
+            click.echo(f"❌ No PDF files found in: {pdf_dir}")
+            sys.exit(1)
+        elif len(pdf_files) > 1:
+            click.echo(f"❌ Multiple PDF files found. Please specify which one to process:")
+            for pdf in pdf_files:
+                click.echo(f"  📄 {pdf.name}")
+            click.echo(f"Use --pdf-path to specify the file")
+            sys.exit(1)
+        else:
+            pdf_file_path = pdf_files[0]
+    
+    if not pdf_file_path.exists():
+        click.echo(f"❌ PDF file not found: {pdf_file_path}")
+        sys.exit(1)
+    
+    # Setup output directory
+    data_dir = Path(config['storage']['data_directory'])
+    output_dir = data_dir / 'town-code' / 'markdown'
+    
+    click.echo(f"🏛️  Processing Municipal Code: {pdf_file_path.name}")
+    click.echo(f"📂 Output directory: {output_dir}")
+    
+    # Check if already processed
+    if output_dir.exists() and any(output_dir.iterdir()) and not force:
+        click.echo("⚠️  Town code already processed. Use --force to reprocess.")
+        sys.exit(1)
+    
+    try:
+        processor = TownCodeProcessor(config)
+        result = processor.process(pdf_file_path, output_dir)
+        
+        click.echo(f"\n✅ Successfully processed municipal code!")
+        click.echo(f"📊 Processing Summary:")
+        click.echo(f"  📄 Total pages: {result['analysis'].page_count}")
+        click.echo(f"  📚 Total chapters: {result['analysis'].metadata.get('total_chapters', 'N/A')}")
+        click.echo(f"  ✅ Successful chapters: {len([c for c in result['processed_chapters'] if c.get('filename')])}")
+        click.echo(f"  ❌ Failed chapters: {len([c for c in result['processed_chapters'] if not c.get('filename')])}")
+        
+        click.echo(f"\n📁 Output files created:")
+        click.echo(f"  📄 Index: {result['output_files']['index_file']}")
+        click.echo(f"  📊 Metadata: {result['output_files']['metadata_file']}")
+        click.echo(f"  🔍 Search Index: {result['output_files']['search_index_file']}")
+        click.echo(f"  📚 Chapters: {result['output_files']['chapters_directory']}")
+        
+        if result['processed_chapters']:
+            click.echo(f"\n📚 Processed Chapters:")
+            for chapter in result['processed_chapters'][:5]:  # Show first 5
+                if chapter.get('filename'):
+                    click.echo(f"  ✅ Chapter {chapter.get('chapter_number', 'N/A')}: {chapter['title'][:50]}...")
+                else:
+                    click.echo(f"  ❌ Failed: {chapter['title'][:50]}...")
+            
+            if len(result['processed_chapters']) > 5:
+                click.echo(f"  ... and {len(result['processed_chapters']) - 5} more chapters")
+                
+    except Exception as e:
+        click.echo(f"❌ Processing failed: {e}")
+        import traceback
+        click.echo(traceback.format_exc())
+        sys.exit(1)
 
 
 if __name__ == '__main__':

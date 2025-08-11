@@ -5,6 +5,7 @@ python-dotenv>=1.0.0
 
 # Document processing
 docling>=1.0.0
+PyPDF2>=3.0.0  # Fallback for page counting when Docling unavailable
 
 # AI/LLM integration
 openai>=1.0.0

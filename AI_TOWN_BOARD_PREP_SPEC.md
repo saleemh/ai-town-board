@@ -19,18 +19,210 @@ The AI Town Board Prep System is a focused solution for intelligent processing a
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Processing Engine                             │
 ├─────────────────────────────────────────────────────────────────┤
-│  Document Processor      │         Agent Framework              │
+│  Universal PDF Processor │         Agent Framework              │
 │                          │                                      │
 │  • IBM Docling           │  • Town Attorney                     │
-│  • PDF → Markdown        │  • Future Agents                     │
-│  • OCR Processing        │  • Plugin System                     │
-│  • Table Extraction      │  • Analysis Generation               │
+│  • Smart Segmentation    │  • Future Agents                     │
+│  • TOC-Driven Splitting  │  • Plugin System                     │
+│  • Cross-Reference Gen   │  • Analysis Generation               │
 ├─────────────────────────────────────────────────────────────────┤
 │                    Data Storage Layer                           │
-│  • Meeting Data   │  • Processed Content  │  • Agent Analysis  │
+│  • Meeting Data   │  • Town Code Data     │  • Agent Analysis  │
 │  • File Management • Metadata Store      │  • Historical Data  │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### Universal PDF Processing Architecture
+
+The system uses a generalized PDF processing pipeline that works for any structured document:
+
+```
+PDF Input → TOC Analysis → Intelligent Segmentation → Markdown Generation
+    ↓             ↓                    ↓                      ↓
+Any PDF    Chapter/Section      Document Splitting      Structured Output
+           Detection            Based on Content         With Metadata
+```
+
+**Document Types Supported:**
+- **Meeting Documents**: Agendas, minutes, attachments (typically 10-50 pages)
+- **Municipal Code**: Complete legal code (500-1000+ pages) 
+- **Report Documents**: Environmental studies, planning reports (50-200 pages)
+- **Legal Documents**: Ordinances, resolutions, contracts (variable length)
+
+## Universal PDF Processing Implementation
+
+### Core Processing Pipeline
+
+#### 1. Document Analysis Phase
+```python
+class DocumentProcessor:
+    def analyze_document(self, pdf_path: Path) -> DocumentAnalysis:
+        """Analyze PDF structure and determine processing strategy"""
+        doc = docling.load_document(pdf_path)
+        
+        analysis = DocumentAnalysis()
+        analysis.page_count = doc.page_count
+        analysis.toc = doc.extract_table_of_contents()
+        analysis.structure = self._detect_structure_type(doc)
+        analysis.segmentation_strategy = self._determine_segmentation(analysis)
+        
+        return analysis
+
+    def _detect_structure_type(self, doc) -> DocumentType:
+        """Detect if document is meeting agenda, municipal code, report, etc."""
+        # AI-powered structure detection based on content patterns
+        pass
+```
+
+#### 2. Intelligent Segmentation Phase
+```python
+def segment_document(self, pdf_path: Path, analysis: DocumentAnalysis) -> List[DocumentSegment]:
+    """Split document into logical segments based on structure"""
+    
+    if analysis.structure == DocumentType.MUNICIPAL_CODE:
+        return self._segment_by_chapters(pdf_path, analysis.toc)
+    elif analysis.structure == DocumentType.MEETING_AGENDA:
+        return self._segment_by_agenda_items(pdf_path, analysis)
+    elif analysis.structure == DocumentType.SINGLE_DOCUMENT:
+        return [DocumentSegment(pdf_path, 1, analysis.page_count)]
+    else:
+        return self._segment_by_sections(pdf_path, analysis.toc)
+
+def _segment_by_chapters(self, pdf_path: Path, toc: TableOfContents) -> List[DocumentSegment]:
+    """Municipal code: one file per chapter"""
+    segments = []
+    for chapter in toc.chapters:
+        segment = DocumentSegment(
+            source_path=pdf_path,
+            start_page=chapter.start_page,
+            end_page=chapter.end_page,
+            title=chapter.title,
+            segment_type="chapter",
+            metadata={"chapter_number": chapter.number}
+        )
+        segments.append(segment)
+    return segments
+
+def _segment_by_agenda_items(self, pdf_path: Path, analysis: DocumentAnalysis) -> List[DocumentSegment]:
+    """Meeting agenda: logical sections (public hearings, new business, etc.)"""
+    # AI-powered agenda item detection
+    pass
+```
+
+#### 3. Markdown Generation Phase
+```python
+def process_segment(self, segment: DocumentSegment) -> ProcessedDocument:
+    """Convert PDF segment to structured markdown"""
+    
+    # Extract pages for this segment
+    segment_pdf = self._extract_pages(segment.source_path, 
+                                    segment.start_page, 
+                                    segment.end_page)
+    
+    # Process with docling
+    processed = docling.process_document(
+        segment_pdf,
+        preserve_hierarchy=True,
+        extract_tables=True,
+        ocr_enabled=True,
+        output_format="markdown"
+    )
+    
+    # Post-process for structure and cross-references
+    markdown = self._enhance_markdown(processed, segment)
+    
+    return ProcessedDocument(
+        content=markdown,
+        metadata=segment.metadata,
+        cross_references=self._extract_references(markdown)
+    )
+```
+
+### Document-Specific Processors
+
+#### Town Code Processor
+```python
+class TownCodeProcessor(UniversalDocumentProcessor):
+    """Specialized processor for municipal code documents"""
+    
+    def process(self, pdf_path: Path) -> TownCodeResult:
+        # Use base class for analysis and segmentation
+        analysis = self.analyze_document(pdf_path)
+        segments = self.segment_document(pdf_path, analysis)
+        
+        # Process each chapter
+        chapters = []
+        for segment in segments:
+            chapter = self.process_segment(segment)
+            chapter = self._enhance_legal_formatting(chapter)
+            chapter = self._extract_definitions(chapter)
+            chapters.append(chapter)
+        
+        # Generate cross-references and search index
+        cross_refs = self._generate_cross_references(chapters)
+        search_index = self._build_search_index(chapters)
+        
+        return TownCodeResult(
+            chapters=chapters,
+            cross_references=cross_refs,
+            search_index=search_index,
+            metadata=self._create_metadata(analysis)
+        )
+```
+
+#### Meeting Document Processor  
+```python
+class MeetingDocumentProcessor(UniversalDocumentProcessor):
+    """Specialized processor for meeting documents"""
+    
+    def process(self, pdf_path: Path) -> MeetingDocumentResult:
+        analysis = self.analyze_document(pdf_path)
+        
+        if analysis.page_count <= 50:  # Typical meeting doc
+            # Process as single document with sections
+            document = self.process_as_single(pdf_path)
+            agenda_items = self._extract_agenda_items(document)
+        else:  # Large meeting packet
+            # Segment by major sections
+            segments = self.segment_document(pdf_path, analysis)
+            sections = [self.process_segment(seg) for seg in segments]
+            agenda_items = self._extract_agenda_items_from_sections(sections)
+        
+        return MeetingDocumentResult(
+            content=document or sections,
+            agenda_items=agenda_items,
+            metadata=self._create_metadata(analysis)
+        )
+```
+
+### Configuration-Driven Processing
+
+```yaml
+document_processing:
+  docling:
+    ocr_enabled: true
+    table_extraction: true
+    image_processing: true
+    output_format: "markdown"
+    batch_size: 5
+  
+  segmentation:
+    municipal_code:
+      strategy: "chapter_based"
+      min_chapter_pages: 3
+      preserve_legal_numbering: true
+    
+    meeting_documents:
+      strategy: "content_based" 
+      max_single_file_pages: 50
+      extract_agenda_items: true
+    
+    reports:
+      strategy: "section_based"
+      detect_appendices: true
+```
+
+This universal architecture allows the town code processor to be a specialized implementation of the general PDF processing system, while meeting documents and other PDF types can use the same underlying infrastructure with different segmentation strategies.
 
 ## Data Architecture
 
