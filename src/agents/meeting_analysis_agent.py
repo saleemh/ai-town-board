@@ -87,6 +87,12 @@ class MeetingAnalysisAgent(BaseAgent):
             if not meeting_path.exists():
                 raise ValueError(f"Meeting directory not found: {query.meeting_dir}")
             
+            # Create analysis directory structure
+            analysis_dir = meeting_path / 'analysis'
+            analysis_dir.mkdir(exist_ok=True)
+            items_dir = analysis_dir / 'agenda_items'
+            items_dir.mkdir(exist_ok=True)
+            
             # Initialize meeting corpus
             meeting_corpus = MeetingCorpus(query.meeting_dir, self.config)
             if not meeting_corpus.is_indexed():
@@ -110,6 +116,11 @@ class MeetingAnalysisAgent(BaseAgent):
                     item_analysis = self._analyze_agenda_item(agenda_item, meeting_corpus)
                     if item_analysis:
                         item_analyses.append(item_analysis)
+                        
+                        # Save individual analysis file immediately
+                        if query.output_format in ['markdown', 'both']:
+                            self._save_individual_analysis(item_analysis, items_dir)
+                        
                         logger.info(f"Analyzed item {agenda_item.item_number}: {agenda_item.title[:50]}...")
                 except Exception as e:
                     logger.error(f"Failed to analyze item {agenda_item.item_number}: {e}")
@@ -206,19 +217,46 @@ Please provide your analysis in the exact format specified in the system prompt,
                 model = self.llm_config.get('model', 'gpt-4')
                 temperature = self.llm_config.get('temperature', 0.1)
                 max_tokens = self.llm_config.get('max_tokens', 2000)
+                provider = self.llm_config.get('llm_provider', 'openai')
                 
-                logger.debug(f"Making LLM request with model={model}, temp={temperature}, max_tokens={max_tokens}")
+                logger.debug(f"Making LLM request with provider={provider}, model={model}, temp={temperature}, max_tokens={max_tokens}")
                 
-                response = self.llm_client.chat.completions.create(
-                    model=model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    temperature=temperature,
-                    max_tokens=max_tokens
-                )
-                analysis_text = response.choices[0].message.content
+                if provider == 'openai':
+                    # OpenAI API structure
+                    request_params = {
+                        'model': model,
+                        'messages': [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt}
+                        ],
+                        'max_completion_tokens': max_tokens
+                    }
+                    
+                    # Only add temperature if it's not the default (1.0) for GPT-5
+                    if not model.startswith('gpt-5') or temperature != 0.1:
+                        if not model.startswith('gpt-5'):
+                            request_params['temperature'] = temperature
+                    
+                    response = self.llm_client.chat.completions.create(**request_params)
+                    analysis_text = response.choices[0].message.content
+                    
+                elif provider == 'anthropic':
+                    # Anthropic API structure
+                    request_params = {
+                        'model': model,
+                        'max_tokens': max_tokens,
+                        'temperature': temperature,
+                        'system': system_prompt,
+                        'messages': [
+                            {"role": "user", "content": user_prompt}
+                        ]
+                    }
+                    
+                    response = self.llm_client.messages.create(**request_params)
+                    analysis_text = response.content[0].text
+                    
+                else:
+                    raise ValueError(f"Unsupported LLM provider: {provider}")
             else:
                 # Fallback analysis - returns dict directly
                 return self._generate_fallback_analysis(agenda_item, content)
@@ -511,3 +549,56 @@ Guidelines:
 
 {item_analyses}
 """
+    
+    def _save_individual_analysis(self, item_analysis, items_dir: Path):
+        """Save individual item analysis to file immediately.
+        
+        Args:
+            item_analysis: ItemAnalysis object to save
+            items_dir: Directory to save individual analysis files
+        """
+        try:
+            from datetime import datetime
+            
+            # Generate filename based on source file instead of item ID
+            source_name = Path(item_analysis.source_file).stem  # Remove .md extension
+            item_filename = f"{source_name}_analysis.md"
+            
+            item_content = f"""# {item_analysis.item_id}: {item_analysis.item_title}
+
+*Analysis generated on {datetime.now().strftime('%Y-%m-%d at %H:%M')}*
+
+**Source File**: [[{Path(item_analysis.source_file).stem}]]
+
+---
+
+## Executive Summary
+{item_analysis.executive_summary}
+
+## Topics Included  
+{item_analysis.topics_included}
+
+## Decisions
+{item_analysis.decisions}
+
+## Other Takeaways
+{item_analysis.other_takeaways}
+
+---
+
+**Metadata**:
+- Item ID: {item_analysis.item_id}
+- Processing Date: {item_analysis.processing_date.strftime('%Y-%m-%d %H:%M UTC') if hasattr(item_analysis, 'processing_date') else 'N/A'}
+- Source: {item_analysis.source_file}
+"""
+            
+            file_path = items_dir / item_filename
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(item_content)
+            
+            logger.debug(f"Saved individual analysis: {file_path}")
+            
+        except Exception as e:
+            logger.error(f"Error saving individual analysis for {item_analysis.item_id}: {e}")
+            # Don't fail the whole analysis if file saving fails
+            pass

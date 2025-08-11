@@ -583,8 +583,8 @@ def analyze(ctx, meeting_dir, output_format, force_rebuild, items_only):
         # Perform analysis
         meeting_analysis = analysis_agent.analyze_meeting(analysis_query)
         
-        # Save results
-        _save_analysis_results(meeting_analysis, analysis_dir, output_format)
+        # Save results (individual files already saved incrementally)
+        _save_analysis_results(meeting_analysis, analysis_dir, output_format, skip_individual=True)
         
         # Display summary
         click.echo(f"✅ Analysis completed successfully!")
@@ -606,7 +606,7 @@ def analyze(ctx, meeting_dir, output_format, force_rebuild, items_only):
         sys.exit(1)
 
 
-def _save_analysis_results(meeting_analysis, analysis_dir: Path, output_format: str):
+def _save_analysis_results(meeting_analysis, analysis_dir: Path, output_format: str, skip_individual: bool = False):
     """Save analysis results to files.
     
     Args:
@@ -616,6 +616,7 @@ def _save_analysis_results(meeting_analysis, analysis_dir: Path, output_format: 
     """
     import json
     from datetime import datetime
+    from pathlib import Path
     
     # Create agenda_items subdirectory
     items_dir = analysis_dir / 'agenda_items'
@@ -654,7 +655,9 @@ def _save_analysis_results(meeting_analysis, analysis_dir: Path, output_format: 
         for item in meeting_analysis.item_analyses:
             summary_content += f"### {item.item_id}: {item.item_title}\n"
             summary_content += f"**Summary**: {item.executive_summary[:200]}...\n\n"
-            summary_content += f"*Full analysis: [agenda_items/item_{item.item_id.lower().replace(' ', '_')}_analysis.md](agenda_items/item_{item.item_id.lower().replace(' ', '_')}_analysis.md)*\n\n"
+            # Generate link based on source file instead of item ID
+            source_name = Path(item.source_file).stem
+            summary_content += f"*Full analysis: [[{source_name}_analysis|View Analysis]]* | *Source: [[{source_name}|View Source]]*\n\n"
         
         with open(analysis_dir / 'meeting_summary.md', 'w', encoding='utf-8') as f:
             f.write(summary_content)
@@ -690,15 +693,17 @@ def _save_analysis_results(meeting_analysis, analysis_dir: Path, output_format: 
         with open(analysis_dir / 'agenda_analysis.json', 'w', encoding='utf-8') as f:
             json.dump(json_data, f, indent=2, ensure_ascii=False)
     
-    # Save individual item analyses
-    if output_format in ['markdown', 'both']:
+    # Save individual item analyses (unless already saved incrementally)
+    if not skip_individual and output_format in ['markdown', 'both']:
         for item in meeting_analysis.item_analyses:
-            item_filename = f"item_{item.item_id.lower().replace(' ', '_')}_analysis.md"
+            # Generate filename based on source file instead of item ID
+            source_name = Path(item.source_file).stem  # Remove .md extension
+            item_filename = f"{source_name}_analysis.md"
             item_content = f"""# {item.item_id}: {item.item_title}
 
 *Analysis generated on {datetime.now().strftime('%Y-%m-%d at %H:%M')}*
 
-**Source File**: `{item.source_file}`
+**Source File**: [[{Path(item.source_file).stem}]]
 
 ---
 

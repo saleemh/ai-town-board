@@ -12,8 +12,8 @@ document_processing:
 agents:
   meeting_expert:
     enabled: true
-    llm_provider: "fallback"                 # Use fallback mode for testing without API key
-    model: "gpt-5"                           # Primary model for meeting analysis
+    llm_provider: "openai"                 # Use fallback mode for testing without API key
+    model: "gpt-5-2025-08-07"                           # Primary model for meeting analysis
     temperature: 0.2                         # Low temperature for factual responses
     max_tokens: 3000                         # Allow longer responses for comprehensive answers
     knowledge_sources: ["meeting"]            # Uses meeting corpus
@@ -21,18 +21,16 @@ agents:
     citation_required: true                  # Always include citations
     max_evidence_items: 8                   # Max evidence pieces to consider
     confidence_threshold: 0.6               # Minimum confidence to respond
-    api_key_env: "OPENAI_API_KEY"           # Environment variable name for API key
     
   meeting_analysis:
     enabled: true
-    llm_provider: "fallback"                 # Use fallback mode for testing without API key
-    model: "gpt-5"                           # Primary model for meeting analysis
+    llm_provider: "anthropic"                   # Use Anthropic API (requires ANTHROPIC_API_KEY in .env)
+    model: "claude-sonnet-4-20250514"                           # Claude 3.5 Sonnet (latest)
     temperature: 0.1                         # Very low temperature for consistent analysis
     max_tokens: 2000                         # Sufficient for structured analysis sections
     knowledge_sources: ["meeting"]            # Uses meeting corpus
     response_format: "structured"            # Structured analysis format
     citation_required: false                 # Analysis doesn't need citations
-    api_key_env: "OPENAI_API_KEY"           # Environment variable name for API key
     prompt_file: "prompts/agents/meeting_analysis.md"  # External prompt file
     # Optional LLM client configuration:
     # base_url: "https://api.openai.com/v1"  # Custom API endpoint
@@ -42,13 +40,12 @@ agents:
   town_attorney:
     enabled: false                          # Disabled until implemented
     llm_provider: "openai"
-    model: "gpt-5"
+    model: "gpt-5-2025-08-07"
     temperature: 0.1
     max_tokens: 2000
     knowledge_sources: ["town_code", "meeting"]
     require_citations: true
     fail_on_missing_citations: true
-    api_key_env: "OPENAI_API_KEY"
     
   # Alternative Anthropic configuration
   # town_attorney:
@@ -57,18 +54,22 @@ agents:
   #   model: "claude-3-sonnet-20240229"
   #   temperature: 0.1
   #   max_tokens: 2000
-  #   api_key_env: "ANTHROPIC_API_KEY"
 
-# API Configuration - Uses your subscription via environment variables
+# API Configuration - Keys loaded from environment variables (.env file)
+# Set OPENAI_API_KEY and/or ANTHROPIC_API_KEY in your .env file
 api:
-  openai:
-    api_key_env: "OPENAI_API_KEY"  # Set this environment variable with your OpenAI API key
-    base_url: null  # Use default OpenAI endpoint
-    organization: null  # Optional: your OpenAI organization ID
-    
-  anthropic:
-    api_key_env: "ANTHROPIC_API_KEY"  # Set this environment variable with your Anthropic API key
-    base_url: null  # Use default Anthropic endpoint
+  # Optional: customize API endpoints or organization settings
+  openai: {}  # Empty config - uses defaults and environment variables
+  anthropic: {}  # Empty config - uses defaults and environment variables
+  # 
+  # Example custom configuration:
+  # openai:
+  #   base_url: "https://api.openai.com/v1"  # Use default if not specified
+  #   organization: "org-xxxxxxxxx"          # Your OpenAI organization ID
+  #   timeout: 30                            # Request timeout in seconds
+  # 
+  # anthropic:
+  #   base_url: null                         # Use default Anthropic endpoint
     
 # Knowledge Provider Configuration  
 knowledge:

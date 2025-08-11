@@ -315,17 +315,43 @@ Please provide a comprehensive answer based on the evidence provided. Include sp
         
         try:
             # Call LLM
-            if self.llm_config.get('llm_provider') == 'openai':
-                response = self.llm_client.chat.completions.create(
-                    model=self.llm_config.get('model', 'gpt-5'),
-                    messages=[
+            provider = self.llm_config.get('llm_provider', 'openai')
+            model = self.llm_config.get('model', 'gpt-5')
+            temperature = self.llm_config.get('temperature', 0.2)
+            max_tokens = self.llm_config.get('max_tokens', 3000)
+            
+            if provider == 'openai':
+                # Some models (like gpt-5) only support default temperature
+                request_params = {
+                    'model': model,
+                    'messages': [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
                     ],
-                    temperature=self.llm_config.get('temperature', 0.2),
-                    max_tokens=self.llm_config.get('max_tokens', 3000)
-                )
+                    'max_completion_tokens': max_tokens
+                }
+                
+                # Only add temperature if it's not the default (1.0) for GPT-5
+                if not model.startswith('gpt-5'):
+                    request_params['temperature'] = temperature
+                
+                response = self.llm_client.chat.completions.create(**request_params)
                 return response.choices[0].message.content
+                
+            elif provider == 'anthropic':
+                # Anthropic API structure
+                request_params = {
+                    'model': model,
+                    'max_tokens': max_tokens,
+                    'temperature': temperature,
+                    'system': system_prompt,
+                    'messages': [
+                        {"role": "user", "content": user_prompt}
+                    ]
+                }
+                
+                response = self.llm_client.messages.create(**request_params)
+                return response.content[0].text
             
             else:
                 # Fallback response if LLM not available

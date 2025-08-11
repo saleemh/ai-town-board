@@ -113,6 +113,9 @@ class BaseAgent(ABC):
         Returns:
             Configured LLM provider instance
         """
+        if not self.llm_config:
+            raise ValueError(f"No LLM configuration found for agent '{self.name}'. Check config.yaml agents section.")
+        
         provider = self.llm_config.get('llm_provider', 'openai')
         model = self.llm_config.get('model', 'gpt-5')
         
@@ -135,6 +138,14 @@ class BaseAgent(ABC):
             import openai
             import os
             
+            # Load .env file if available
+            try:
+                from dotenv import load_dotenv
+                load_dotenv()
+            except ImportError:
+                # dotenv not installed, continue with system env vars only
+                pass
+            
             # Get API key from environment
             api_key_env = self.llm_config.get('api_key_env', 'OPENAI_API_KEY')
             api_key = os.getenv(api_key_env)
@@ -144,16 +155,24 @@ class BaseAgent(ABC):
             # Build client parameters from config
             client_params = {'api_key': api_key}
             
-            # Add optional parameters from config
-            if 'base_url' in self.llm_config and self.llm_config['base_url']:
-                client_params['base_url'] = self.llm_config['base_url']
-                logger.debug(f"Using custom base_url: {self.llm_config['base_url']}")
+            # Add optional parameters from agent config or global API config
+            global_api_config = self.config.get('api', {}).get('openai', {})
             
-            if 'organization' in self.llm_config and self.llm_config['organization']:
-                client_params['organization'] = self.llm_config['organization']
+            # Check for base_url in agent config first, then global config
+            base_url = self.llm_config.get('base_url') or global_api_config.get('base_url')
+            if base_url:
+                client_params['base_url'] = base_url
+                logger.debug(f"Using custom base_url: {base_url}")
+            
+            # Check for organization in agent config first, then global config  
+            organization = self.llm_config.get('organization') or global_api_config.get('organization')
+            if organization:
+                client_params['organization'] = organization
                 
-            if 'timeout' in self.llm_config and self.llm_config['timeout']:
-                client_params['timeout'] = self.llm_config['timeout']
+            # Check for timeout in agent config first, then global config
+            timeout = self.llm_config.get('timeout') or global_api_config.get('timeout')
+            if timeout:
+                client_params['timeout'] = timeout
             
             client = openai.OpenAI(**client_params)
             logger.debug(f"Initialized OpenAI client for model: {model}")
@@ -170,14 +189,36 @@ class BaseAgent(ABC):
         """
         try:
             import anthropic
-            
-            # Get API key from environment
             import os
-            api_key = os.getenv(self.llm_config.get('api_key_env', 'ANTHROPIC_API_KEY'))
-            if not api_key:
-                raise ValueError(f"Missing API key environment variable: {self.llm_config.get('api_key_env', 'ANTHROPIC_API_KEY')}")
             
-            client = anthropic.Anthropic(api_key=api_key)
+            # Load .env file if available
+            try:
+                from dotenv import load_dotenv
+                load_dotenv()
+            except ImportError:
+                # dotenv not installed, continue with system env vars only
+                pass
+            
+            # Get API key from environment  
+            api_key_env = self.llm_config.get('api_key_env', 'ANTHROPIC_API_KEY')
+            api_key = os.getenv(api_key_env)
+            if not api_key:
+                raise ValueError(f"Missing API key environment variable: {api_key_env}")
+            
+            # Build client parameters from config
+            client_params = {'api_key': api_key}
+            
+            # Add optional parameters from agent config or global API config
+            global_api_config = self.config.get('api', {}).get('anthropic', {})
+            
+            # Check for base_url in agent config first, then global config
+            base_url = self.llm_config.get('base_url') or global_api_config.get('base_url')
+            if base_url:
+                client_params['base_url'] = base_url
+                logger.debug(f"Using custom Anthropic base_url: {base_url}")
+            
+            client = anthropic.Anthropic(**client_params)
+            logger.debug(f"Initialized Anthropic client for model: {model}")
             return client
             
         except ImportError:
