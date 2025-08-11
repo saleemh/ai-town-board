@@ -4,6 +4,7 @@ Command-line interface for processing meeting documents with AI analysis.
 """
 
 import logging
+import re
 import sys
 from pathlib import Path
 
@@ -15,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from processors.document_processor import DocumentProcessor
 from processors.town_code_processor import TownCodeProcessor
+from processors.meeting_processor import MeetingDocumentProcessor
 
 
 def setup_logging(level: str = "INFO"):
@@ -55,18 +57,18 @@ def cli(ctx, config, log_level):
     
 
 @cli.command()
-@click.option('--date', required=True, help='Meeting date in YYYY-MM-DD format')
+@click.option('--folder', required=True, help='Meeting folder name (any name allowed)')
 @click.option('--force', is_flag=True, help='Reprocess existing markdown files')
 @click.pass_context
-def process(ctx, date, force):
+def process(ctx, folder, force):
     """Process meeting documents to markdown format using Docling."""
     config = ctx.obj['config']
     
-    click.echo(f"Processing documents for meeting date: {date}")
+    click.echo(f"Processing documents in folder: {folder}")
     
-    # Check if meeting directory exists
+    # Use the folder name directly - no restrictions on format
     data_dir = Path(config['storage']['data_directory'])
-    meeting_dir = data_dir / 'meetings' / f"{date}-regular"
+    meeting_dir = data_dir / 'meetings' / folder
     
     if not meeting_dir.exists():
         click.echo(f"❌ Meeting directory not found: {meeting_dir}")
@@ -90,12 +92,20 @@ def process(ctx, date, force):
         click.echo(f"  📄 {doc.name}")
     
     try:
-        processor = DocumentProcessor(config)
-        results = processor.process_meeting_documents(meeting_dir, force=force)
+        processor = MeetingDocumentProcessor(config)
+        result = processor.process_meeting_directory(meeting_dir, force=force)
         
-        click.echo(f"✅ Successfully processed {len(results)} documents")
-        for result in results:
-            click.echo(f"  ✅ {result['filename']} → {result['markdown_file']}")
+        processed_docs = [d for d in result['processed_documents'] if d.get('filename')]
+        failed_docs = [d for d in result['processed_documents'] if d.get('error')]
+        
+        click.echo(f"✅ Successfully processed {len(processed_docs)} documents")
+        for doc in processed_docs:
+            click.echo(f"  ✅ {doc['source_file']} → {doc['filename']}")
+        
+        if failed_docs:
+            click.echo(f"❌ Failed to process {len(failed_docs)} documents")
+            for doc in failed_docs:
+                click.echo(f"  ❌ {doc['source_file']}: {doc['error']}")
             
     except Exception as e:
         click.echo(f"❌ Processing failed: {e}")
@@ -117,8 +127,9 @@ def process_all(ctx, path, force):
         click.echo(f"❌ Meetings directory not found: {meetings_path}")
         sys.exit(1)
         
-    # Find all meeting directories
-    meeting_dirs = [d for d in meetings_path.iterdir() if d.is_dir() and '-' in d.name]
+    # Find all meeting directories (look for YYYY-MM-DD pattern)
+    meeting_dirs = [d for d in meetings_path.iterdir() 
+                   if d.is_dir() and re.match(r'\d{4}-\d{2}-\d{2}', d.name)]
     
     if not meeting_dirs:
         click.echo(f"❌ No meeting directories found in: {meetings_path}")
@@ -130,22 +141,39 @@ def process_all(ctx, path, force):
         click.echo(f"  📁 {meeting_dir.name}")
         
     try:
-        processor = DocumentProcessor(config)
+        processor = MeetingDocumentProcessor(config)
         total_processed = 0
+        total_failed = 0
         
         for meeting_dir in sorted(meeting_dirs):
             originals_dir = meeting_dir / 'originals'
             if originals_dir.exists() and any(originals_dir.glob('*.pdf')):
                 click.echo(f"\n📋 Processing {meeting_dir.name}...")
-                results = processor.process_meeting_documents(meeting_dir, force=force)
-                total_processed += len(results)
                 
-                for result in results:
-                    click.echo(f"  ✅ {result['filename']} → {result['markdown_file']}")
+                try:
+                    result = processor.process_meeting_directory(meeting_dir, force=force)
+                    
+                    processed_docs = [d for d in result['processed_documents'] if d.get('filename')]
+                    failed_docs = [d for d in result['processed_documents'] if d.get('error')]
+                    
+                    total_processed += len(processed_docs)
+                    total_failed += len(failed_docs)
+                    
+                    for doc in processed_docs:
+                        click.echo(f"  ✅ {doc['source_file']} → {doc['filename']}")
+                    
+                    for doc in failed_docs:
+                        click.echo(f"  ❌ {doc['source_file']}: {doc['error']}")
+                        
+                except Exception as e:
+                    click.echo(f"  ❌ Failed to process {meeting_dir.name}: {e}")
+                    total_failed += 1
             else:
                 click.echo(f"  ⏭️  Skipping {meeting_dir.name} (no PDFs found)")
                 
         click.echo(f"\n✅ Successfully processed {total_processed} documents total")
+        if total_failed > 0:
+            click.echo(f"❌ Failed to process {total_failed} documents")
         
     except Exception as e:
         click.echo(f"❌ Processing failed: {e}")

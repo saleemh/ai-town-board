@@ -758,15 +758,79 @@ class UniversalDocumentProcessor(ABC):
     
     def _segment_by_agenda_items(self, pdf_path: Path, analysis: DocumentAnalysis) -> List[DocumentSegment]:
         """Segment meeting documents by agenda items."""
-        logger.warning("Agenda item segmentation not implemented, using single file")
-        return [DocumentSegment(
-            source_path=pdf_path,
-            start_page=1,
-            end_page=analysis.page_count,
-            title="Complete Agenda",
-            segment_type="agenda",
-            metadata=analysis.metadata
-        )]
+        logger.info("Segmenting meeting document using agenda item-based approach")
+        
+        if not analysis.toc or not analysis.toc.entries:
+            logger.warning("No TOC found, using single document processing")
+            return [DocumentSegment(
+                source_path=pdf_path,
+                start_page=1,
+                end_page=analysis.page_count,
+                title="Complete Agenda", 
+                segment_type="agenda",
+                metadata=analysis.metadata
+            )]
+        
+        # Create segments based on TOC structure
+        segments = []
+        sorted_entries = sorted(analysis.toc.entries, key=lambda x: x.get('page_number', 0))
+        
+        # Filter for reasonable agenda items (level 1 and 2)
+        agenda_entries = [entry for entry in sorted_entries 
+                         if entry.get('level', 1) <= 2 and entry.get('page_number', 0) > 0]
+        
+        logger.info(f"Processing {len(agenda_entries)} agenda-level entries from {len(analysis.toc.entries)} total TOC entries")
+        
+        for i, entry in enumerate(agenda_entries):
+            start_page = entry.get('page_number', 1)
+            
+            # Find end page (start of next agenda item or end of document)
+            if i + 1 < len(agenda_entries):
+                end_page = agenda_entries[i + 1].get('page_number', analysis.page_count) - 1
+            else:
+                end_page = analysis.page_count
+            
+            # Skip very small segments (less than 1 page)
+            if end_page < start_page:
+                continue
+            
+            # Create segment
+            title = entry.get('title', f'Agenda Item {i+1}')
+            level = entry.get('level', 1)
+            section_id = entry.get('id', str(i))
+            
+            segment = DocumentSegment(
+                source_path=pdf_path,
+                start_page=start_page,
+                end_page=end_page,
+                title=title,
+                segment_type=f"agenda_item_level_{level}",
+                metadata={
+                    **analysis.metadata,
+                    'original_toc_entry': entry,
+                    'agenda_item_index': i,
+                    'agenda_item_level': level,
+                    'page_count': end_page - start_page + 1
+                },
+                level=level,
+                section_id=section_id
+            )
+            
+            segments.append(segment)
+        
+        if not segments:
+            logger.warning("No valid agenda segments created, using single document")
+            return [DocumentSegment(
+                source_path=pdf_path,
+                start_page=1,
+                end_page=analysis.page_count,
+                title="Complete Meeting Document",
+                segment_type="complete_agenda",
+                metadata=analysis.metadata
+            )]
+        
+        logger.info(f"Created {len(segments)} agenda-based segments")
+        return segments
     
     def _segment_by_pages(self, pdf_path: Path, analysis: DocumentAnalysis) -> List[DocumentSegment]:
         """Segment by page ranges."""

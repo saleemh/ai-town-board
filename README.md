@@ -244,12 +244,32 @@ cp "Your Town Code.pdf" data/town-code/originals/
 python -m src ingest-town-code
 ```
 
+### 📋 Meeting Documents
+
+Add meeting documents to any folder structure you prefer:
+
+```bash
+# Create meeting folder (use ANY name you want)
+mkdir -p data/meetings/your-folder-name/originals
+
+# Add your meeting PDFs
+cp "Meeting Agenda.pdf" data/meetings/your-folder-name/originals/
+cp "Meeting Packet.pdf" data/meetings/your-folder-name/originals/
+
+# Process with agenda item segmentation
+python -m src process --folder your-folder-name
+
+# Or process all meeting folders at once
+python -m src process-all
+```
+
 **📄 System automatically handles:**
-- Document type detection (Municipal Code vs. other types)
+- Document type detection (Municipal Code vs. Meeting Documents)
 - TOC extraction from PDF bookmarks/outline
-- Intelligent chapter-level segmentation 
+- Intelligent segmentation (chapters for codes, agenda items for meetings)
 - Hierarchical structure preservation
 - PDF fragment creation for traceability
+- Flexible folder naming for meetings
 
 **💡 Document Sources:**
 - Municipal website code repositories
@@ -260,19 +280,31 @@ python -m src ingest-town-code
 ## 📋 Next Steps
 
 ### For Users:
+
+**Municipal Code:**
 1. **Add your municipal code PDF** to `data/town-code/originals/`
 2. **Run the processor**: `python -m src ingest-town-code`  
 3. **Explore results** in `data/town-code/markdown/`
    - Browse individual chapters in `chapters/`
    - Check original PDF segments in `pdf-segments/`
    - Use `index.md` for hierarchical navigation
-4. **For updates**: Use `python -m src ingest-town-code --force` to reprocess
+
+**Meeting Documents:**
+1. **Create meeting folder** with any name: `data/meetings/your-folder-name/originals/`
+2. **Add meeting PDFs** to the originals folder
+3. **Process documents**: `python -m src process --folder your-folder-name`
+4. **Explore results** in `data/meetings/your-folder-name/markdown/`
+   - Individual agenda item segments with full OCR processing
+   - PDF fragments in `pdf-segments/` for traceability
+   - Use `index.md` for navigation
+
+**For updates**: Use `--force` flag to reprocess and cleanup previous files
 
 ### For Developers:
 - **See `AI_TOWN_BOARD_PREP_SPEC.md`** for complete technical specification
-- **Current system** is production-ready for municipal code processing
-- **Next priority**: Meeting document processing pipeline
-- **Future priority**: AI agent framework for legal analysis
+- **Current system** is production-ready for both municipal code and meeting document processing
+- **Next priority**: AI agent framework for legal analysis and automated insights
+- **Extension points**: Easy to add new document types and processing strategies
 
 ## 🔗 Additional Documentation
 

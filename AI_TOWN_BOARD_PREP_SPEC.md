@@ -230,17 +230,20 @@ This universal architecture allows the town code processor to be a specialized i
 ```
 /data/
 ├── meetings/                           # Meeting-specific data
-│   └── {YYYY-MM-DD}-{meeting-type}/   # Date-based organization
-│       ├── originals/                 # Raw downloaded files
+│   └── {any-folder-name}/             # Flexible folder naming (any name allowed)
+│       ├── originals/                 # Raw PDF documents
 │       │   ├── agenda.pdf
 │       │   ├── packet.pdf
 │       │   └── attachments/
-│       ├── markdown/                  # Processed markdown files
-│       │   ├── agenda.md
-│       │   ├── packet.md
-│       │   └── attachments/
-│       ├── metadata.json              # Meeting info & agenda items
-│       └── analysis/                  # AI agent assessments
+│       ├── markdown/                  # Processed markdown files with segmentation
+│       │   ├── meeting-packet-01-agenda-item-1.md
+│       │   ├── meeting-packet-02-agenda-item-2.md
+│       │   ├── pdf-segments/          # PDF fragments for traceability
+│       │   │   ├── L02-1-agenda-item-1.pdf
+│       │   │   └── L02-2-agenda-item-2.pdf
+│       │   ├── index.md               # Master document index
+│       │   └── metadata.json          # Processing metadata
+│       └── analysis/                  # AI agent assessments (future)
 │           └── town-attorney/
 │               ├── assessment.md
 │               └── relevant-codes.json
@@ -581,40 +584,36 @@ storage:
 
 ## Usage Examples
 
-### Collecting Meeting Data
+### Meeting Document Processing (IMPLEMENTED)
 ```bash
-# Collect all documents for specific meeting
-python -m ai_town_board collect --date 2024-08-13
+# Process documents in any meeting folder
+python -m src process --folder 2025-08-13
+python -m src process --folder special-meeting-today
+python -m src process --folder budget-workshop
 
-# Refresh existing meeting (check for updates)
-python -m ai_town_board collect --date 2024-08-13 --refresh
+# Force reprocessing (cleans up previous files)
+python -m src process --folder meeting-name --force
 
-# Collect date range
-python -m ai_town_board collect --start 2024-08-01 --end 2024-08-31
+# Process all meeting folders
+python -m src process-all
+
+# Process all with force cleanup
+python -m src process-all --force
 ```
 
-### Running Analysis
+### Municipal Code Processing (IMPLEMENTED)
 ```bash
-# Analyze specific meeting with all agents
-python -m ai_town_board analyze --date 2024-08-13
+# Process municipal code PDF
+python -m src ingest-town-code
 
-# Run only Town Attorney analysis
-python -m ai_town_board analyze --date 2024-08-13 --agents town_attorney
-
-# Batch analysis for multiple meetings
-python -m ai_town_board analyze --start 2024-08-01 --end 2024-08-31
+# Reprocess with force cleanup
+python -m src ingest-town-code --force
 ```
 
-### Town Code Management
+### System Status (IMPLEMENTED)
 ```bash
-# Update town code
-python -m ai_town_board update_code
-
-# Search town code
-python -m ai_town_board search_code "special use permit"
-
-# Rebuild search index
-python -m ai_town_board rebuild_index
+# Check system configuration and status
+python -m src status
 ```
 
 ## Extension Points
