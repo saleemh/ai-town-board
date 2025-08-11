@@ -17,6 +17,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 from processors.document_processor import DocumentProcessor
 from processors.town_code_processor import TownCodeProcessor
 from processors.meeting_processor import MeetingDocumentProcessor
+from agents.meeting_expert_agent import MeetingExpertAgent
+from agents.meeting_analysis_agent import MeetingAnalysisAgent
+from schemas import AgentQuery, AnalysisQuery
 
 
 def setup_logging(level: str = "INFO"):
@@ -181,6 +184,209 @@ def process_all(ctx, path, force):
 
 
 @cli.command()
+@click.option('--meeting-dir', required=True, help='Path to meeting directory')
+@click.option('--agent', default='meeting_expert', help='Agent to use for query (meeting_expert)')
+@click.option('--question', required=True, help='Question to ask the agent')
+@click.pass_context
+def query(ctx, meeting_dir, agent, question):
+    """Query an AI agent about meeting content."""
+    config = ctx.obj['config']
+    
+    # Validate meeting directory
+    meeting_path = Path(meeting_dir)
+    if not meeting_path.exists():
+        click.echo(f"❌ Meeting directory not found: {meeting_dir}")
+        sys.exit(1)
+    
+    # Check for processed markdown
+    markdown_dir = meeting_path / 'markdown'
+    if not markdown_dir.exists():
+        click.echo(f"❌ No processed markdown found in: {markdown_dir}")
+        click.echo("Please run document processing first:")
+        click.echo(f"  python -m src process --folder {meeting_path.name}")
+        sys.exit(1)
+    
+    # Initialize agent
+    if agent == 'meeting_expert':
+        agent_instance = MeetingExpertAgent('meeting_expert', config)
+    else:
+        click.echo(f"❌ Unknown agent: {agent}")
+        click.echo("Available agents: meeting_expert")
+        sys.exit(1)
+    
+    click.echo(f"🤖 Querying {agent} agent...")
+    click.echo(f"📁 Meeting: {meeting_path.name}")
+    click.echo(f"❓ Question: {question}\n")
+    
+    # Process query
+    query_obj = AgentQuery(
+        question=question,
+        meeting_dir=str(meeting_path)
+    )
+    
+    try:
+        response = agent_instance.query(query_obj)
+        
+        # Display response
+        click.echo(f"📋 **Answer** (Confidence: {response.confidence:.2f})\n")
+        click.echo(response.answer)
+        
+        if response.citations:
+            click.echo(f"\n\n📚 **Sources** ({len(response.citations)} citations):")
+            for i, citation in enumerate(response.citations, 1):
+                file_name = Path(citation.file_path).name if citation.file_path else "Unknown"
+                click.echo(f"  {i}. {file_name}")
+        
+        if response.processing_time_ms:
+            click.echo(f"\n⏱️  Processing time: {response.processing_time_ms}ms")
+                
+    except Exception as e:
+        click.echo(f"❌ Query failed: {e}")
+        sys.exit(1)
+
+
+@cli.command()
+@click.option('--meeting-dir', required=True, help='Path to meeting directory')
+@click.option('--agent', default='meeting_expert', help='Agent for interactive session')
+@click.pass_context
+def interactive(ctx, meeting_dir, agent):
+    """Start interactive Q&A session with an agent."""
+    config = ctx.obj['config']
+    
+    # Validate meeting directory
+    meeting_path = Path(meeting_dir)
+    if not meeting_path.exists():
+        click.echo(f"❌ Meeting directory not found: {meeting_dir}")
+        sys.exit(1)
+    
+    # Initialize agent
+    if agent == 'meeting_expert':
+        agent_instance = MeetingExpertAgent('meeting_expert', config)
+    else:
+        click.echo(f"❌ Unknown agent: {agent}")
+        sys.exit(1)
+    
+    click.echo(f"🤖 Starting interactive session with {agent}")
+    click.echo(f"📁 Meeting: {meeting_path.name}")
+    click.echo("💡 Type 'exit' to quit, 'help' for suggestions\n")
+    
+    while True:
+        try:
+            question = click.prompt("❓ Your question")
+        except (EOFError, KeyboardInterrupt):
+            click.echo("\n👋 Goodbye!")
+            break
+        
+        if question.lower() in ['exit', 'quit', 'q']:
+            click.echo("👋 Goodbye!")
+            break
+        elif question.lower() == 'help':
+            click.echo("""
+💡 **Suggested Questions:**
+- "What's on the agenda for this meeting?"
+- "Tell me about agenda item 5B"
+- "What documents are related to permits?"
+- "Who needs to speak at this meeting?"
+- "What are the key issues being discussed?"
+- "What's the administrator update about?"
+            """)
+            continue
+        
+        # Process query
+        query_obj = AgentQuery(question=question, meeting_dir=str(meeting_path))
+        
+        try:
+            response = agent_instance.query(query_obj)
+            click.echo(f"\n🤖 **Answer** (Confidence: {response.confidence:.2f})")
+            click.echo(response.answer)
+            
+            if response.citations:
+                click.echo(f"\n📚 **Sources**: {len(response.citations)} citations")
+            click.echo()
+            
+        except Exception as e:
+            click.echo(f"❌ Error: {e}\n")
+
+
+@cli.command()
+@click.option('--meeting-dir', required=True, help='Path to meeting directory to index')
+@click.option('--force', is_flag=True, help='Force rebuild of existing index')
+@click.pass_context
+def index_meeting(ctx, meeting_dir, force):
+    """Index a meeting directory for faster querying."""
+    config = ctx.obj['config']
+    
+    # Validate meeting directory
+    meeting_path = Path(meeting_dir)
+    if not meeting_path.exists():
+        click.echo(f"❌ Meeting directory not found: {meeting_dir}")
+        sys.exit(1)
+    
+    click.echo(f"📋 Indexing meeting: {meeting_path.name}")
+    
+    try:
+        from knowledge.meeting_corpus import MeetingCorpus
+        
+        # Create meeting corpus
+        corpus = MeetingCorpus(str(meeting_path), config)
+        
+        # Index the meeting
+        success = corpus.index_corpus(force_rebuild=force)
+        
+        if success:
+            stats = corpus.get_corpus_stats()
+            click.echo(f"✅ Successfully indexed meeting")
+            click.echo(f"   📄 Documents: {stats['document_count']}")
+            click.echo(f"   🧩 Chunks: {stats['chunk_count']}")
+            click.echo(f"   💾 Index size: {stats['index_size_mb']:.1f} MB")
+        else:
+            click.echo(f"❌ Failed to index meeting")
+            sys.exit(1)
+            
+    except Exception as e:
+        click.echo(f"❌ Indexing failed: {e}")
+        sys.exit(1)
+
+
+@cli.command()
+@click.pass_context
+def list_agents(ctx):
+    """List available AI agents and their capabilities."""
+    config = ctx.obj['config']
+    
+    click.echo("🤖 Available AI Agents:\n")
+    
+    # Meeting Expert Agent
+    meeting_config = config.get('agents', {}).get('meeting_expert', {})
+    enabled = meeting_config.get('enabled', False)
+    model = meeting_config.get('model', 'unknown')
+    
+    status_icon = "✅" if enabled else "❌"
+    click.echo(f"{status_icon} **meeting_expert** - Town Board Meeting Expert")
+    click.echo(f"   Model: {model}")
+    click.echo(f"   Capabilities:")
+    click.echo(f"     • Agenda overviews and summaries")
+    click.echo(f"     • Specific agenda item analysis")
+    click.echo(f"     • Document search and retrieval")
+    click.echo(f"     • Meeting participant information")
+    click.echo(f"     • Procedural questions")
+    click.echo()
+    
+    # Town Attorney Agent (future)
+    attorney_config = config.get('agents', {}).get('town_attorney', {})
+    attorney_enabled = attorney_config.get('enabled', False)
+    attorney_status = "✅" if attorney_enabled else "🔄"
+    
+    click.echo(f"{attorney_status} **town_attorney** - Town Attorney Advisor")
+    click.echo(f"   Status: {'Enabled' if attorney_enabled else 'Coming Soon'}")
+    click.echo(f"   Capabilities:")
+    click.echo(f"     • Legal analysis of agenda items")
+    click.echo(f"     • Town code relevance detection")
+    click.echo(f"     • Compliance assessment")
+    click.echo(f"     • Risk identification")
+
+
+@cli.command()
 @click.pass_context
 def status(ctx):
     """Show system status and configuration."""
@@ -222,6 +428,19 @@ def status(ctx):
             
             if meetings_with_pdfs > meetings_with_markdown:
                 click.echo(f"  💡 Run 'python -m src process-all' to convert PDFs to Markdown")
+    
+    # Show agent status
+    click.echo("\n🤖 Agent Status:")
+    agents_config = config.get('agents', {})
+    
+    for agent_name, agent_config in agents_config.items():
+        enabled = agent_config.get('enabled', False)
+        model = agent_config.get('model', 'unknown')
+        status_icon = "✅" if enabled else "❌"
+        click.echo(f"  {status_icon} {agent_name}: {model}")
+    
+    if any(agent.get('enabled', False) for agent in agents_config.values()):
+        click.echo(f"  💡 Try: 'python -m src query --meeting-dir data/meetings/2025-08-13 --question \"What's on the agenda?\"'")
     else:
         click.echo("  📁 Data directory will be created on first use")
 
@@ -310,6 +529,201 @@ def ingest_town_code(ctx, pdf_path, force):
         import traceback
         click.echo(traceback.format_exc())
         sys.exit(1)
+
+
+@cli.command()
+@click.option('--meeting-dir', required=True, help='Path to meeting directory to analyze')
+@click.option('--output-format', default='both', type=click.Choice(['markdown', 'json', 'both']), 
+              help='Output format for analysis (default: both)')
+@click.option('--force-rebuild', is_flag=True, help='Regenerate analysis even if it exists')
+@click.option('--items-only', is_flag=True, help='Analyze individual items only, skip full meeting summary')
+@click.pass_context
+def analyze(ctx, meeting_dir, output_format, force_rebuild, items_only):
+    """Analyze meeting documents and generate comprehensive summaries."""
+    config = ctx.obj['config']
+    
+    # Convert relative path to absolute
+    meeting_path = Path(meeting_dir)
+    if not meeting_path.is_absolute():
+        meeting_path = Path.cwd() / meeting_path
+    
+    if not meeting_path.exists():
+        click.echo(f"❌ Meeting directory not found: {meeting_path}")
+        sys.exit(1)
+    
+    # Check for processed markdown
+    markdown_dir = meeting_path / 'markdown'
+    if not markdown_dir.exists():
+        click.echo(f"❌ No processed markdown found in: {markdown_dir}")
+        click.echo("Please run document processing first:")
+        click.echo(f"  python -m src process --folder {meeting_path.name}")
+        sys.exit(1)
+    
+    # Create analysis directory
+    analysis_dir = meeting_path / 'analysis'
+    analysis_dir.mkdir(exist_ok=True)
+    
+    click.echo(f"🔍 Analyzing meeting: {meeting_path.name}")
+    click.echo(f"📁 Analysis directory: {analysis_dir}")
+    click.echo(f"📝 Output format: {output_format}\n")
+    
+    # Initialize analysis agent
+    analysis_agent = MeetingAnalysisAgent('meeting_analysis', config)
+    
+    # Create analysis query
+    analysis_query = AnalysisQuery(
+        meeting_dir=str(meeting_path),
+        output_format=output_format,
+        force_rebuild=force_rebuild,
+        items_only=items_only,
+        analysis_depth='comprehensive'
+    )
+    
+    try:
+        # Perform analysis
+        meeting_analysis = analysis_agent.analyze_meeting(analysis_query)
+        
+        # Save results
+        _save_analysis_results(meeting_analysis, analysis_dir, output_format)
+        
+        # Display summary
+        click.echo(f"✅ Analysis completed successfully!")
+        click.echo(f"📊 Analyzed {meeting_analysis.total_items} agenda items")
+        click.echo(f"📁 Results saved to: {analysis_dir}")
+        
+        if output_format in ['markdown', 'both']:
+            click.echo(f"📄 Main summary: {analysis_dir}/meeting_summary.md")
+            
+        if output_format in ['json', 'both']:
+            click.echo(f"📋 Structured data: {analysis_dir}/agenda_analysis.json")
+            
+        click.echo(f"📂 Individual analyses: {analysis_dir}/agenda_items/")
+        
+    except Exception as e:
+        click.echo(f"❌ Analysis failed: {e}")
+        import traceback
+        click.echo(traceback.format_exc())
+        sys.exit(1)
+
+
+def _save_analysis_results(meeting_analysis, analysis_dir: Path, output_format: str):
+    """Save analysis results to files.
+    
+    Args:
+        meeting_analysis: MeetingAnalysis object with results
+        analysis_dir: Directory to save results
+        output_format: Format to save ('markdown', 'json', 'both')
+    """
+    import json
+    from datetime import datetime
+    
+    # Create agenda_items subdirectory
+    items_dir = analysis_dir / 'agenda_items'
+    items_dir.mkdir(exist_ok=True)
+    
+    # Save main meeting summary (markdown)
+    if output_format in ['markdown', 'both']:
+        summary_content = f"""# Meeting Analysis: {meeting_analysis.meeting_date}
+
+*Generated on {datetime.now().strftime('%Y-%m-%d at %H:%M')}*
+
+## Executive Summary
+{meeting_analysis.executive_summary}
+
+## Topics Included
+{meeting_analysis.topics_included}
+
+## Decisions
+{meeting_analysis.decisions}
+
+## Other Takeaways
+{meeting_analysis.other_takeaways}
+
+---
+
+## Meeting Overview
+- **Total Agenda Items**: {meeting_analysis.total_items}
+- **Processing Date**: {meeting_analysis.processing_date.strftime('%Y-%m-%d %H:%M UTC')}
+- **Analysis Directory**: {meeting_analysis.meeting_dir}
+
+## Individual Item Summaries
+
+"""
+        
+        # Add brief summaries of each item
+        for item in meeting_analysis.item_analyses:
+            summary_content += f"### {item.item_id}: {item.item_title}\n"
+            summary_content += f"**Summary**: {item.executive_summary[:200]}...\n\n"
+            summary_content += f"*Full analysis: [agenda_items/item_{item.item_id.lower().replace(' ', '_')}_analysis.md](agenda_items/item_{item.item_id.lower().replace(' ', '_')}_analysis.md)*\n\n"
+        
+        with open(analysis_dir / 'meeting_summary.md', 'w', encoding='utf-8') as f:
+            f.write(summary_content)
+    
+    # Save structured JSON data
+    if output_format in ['json', 'both']:
+        json_data = {
+            'meeting_date': meeting_analysis.meeting_date,
+            'meeting_dir': meeting_analysis.meeting_dir,
+            'executive_summary': meeting_analysis.executive_summary,
+            'topics_included': meeting_analysis.topics_included,
+            'decisions': meeting_analysis.decisions,
+            'other_takeaways': meeting_analysis.other_takeaways,
+            'total_items': meeting_analysis.total_items,
+            'processing_date': meeting_analysis.processing_date.isoformat(),
+            'metadata': meeting_analysis.metadata,
+            'agenda_items': []
+        }
+        
+        for item in meeting_analysis.item_analyses:
+            json_data['agenda_items'].append({
+                'item_id': item.item_id,
+                'item_title': item.item_title,
+                'source_file': item.source_file,
+                'executive_summary': item.executive_summary,
+                'topics_included': item.topics_included,
+                'decisions': item.decisions,
+                'other_takeaways': item.other_takeaways,
+                'processing_date': item.processing_date.isoformat(),
+                'metadata': item.metadata
+            })
+        
+        with open(analysis_dir / 'agenda_analysis.json', 'w', encoding='utf-8') as f:
+            json.dump(json_data, f, indent=2, ensure_ascii=False)
+    
+    # Save individual item analyses
+    if output_format in ['markdown', 'both']:
+        for item in meeting_analysis.item_analyses:
+            item_filename = f"item_{item.item_id.lower().replace(' ', '_')}_analysis.md"
+            item_content = f"""# {item.item_id}: {item.item_title}
+
+*Analysis generated on {datetime.now().strftime('%Y-%m-%d at %H:%M')}*
+
+**Source File**: `{item.source_file}`
+
+---
+
+## Executive Summary
+{item.executive_summary}
+
+## Topics Included  
+{item.topics_included}
+
+## Decisions
+{item.decisions}
+
+## Other Takeaways
+{item.other_takeaways}
+
+---
+
+**Metadata**:
+- Item ID: {item.item_id}
+- Processing Date: {item.processing_date.strftime('%Y-%m-%d %H:%M UTC')}
+- Source: {item.source_file}
+"""
+            
+            with open(items_dir / item_filename, 'w', encoding='utf-8') as f:
+                f.write(item_content)
 
 
 if __name__ == '__main__':

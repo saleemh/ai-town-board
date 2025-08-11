@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--01-B-Administrator-Update.md",
+                "file": "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--05-B-Consider-receipt-of-a-Local-Law-to-ame.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "2025-08-13-Town-Board-Meeting--01-B-Administrator-Update"
+              "title": "2025-08-13-Town-Board-Meeting--05-B-Consider-receipt-of-a-Local-Law-to-ame"
             }
           }
         ]
@@ -78,7 +78,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 556.5
+    "width": 442.5
   },
   "right": {
     "id": "c48910c5b40f0898",
@@ -169,43 +169,43 @@
       "audio-recorder:Start/stop recording": false
     }
   },
-  "active": "af9fe24cdad32853",
+  "active": "fd87e7a501edf4de",
   "lastOpenFiles": [
-    "data/meetings/2025-08-13/markdown/pdf-segments/L02-1-b-administrator-update.pdf",
-    "data/meetings/2025-08-13/markdown/pdf-segments/L02-2-b-consider-receipt-of-a-local-law-to-amend-town-co.pdf",
-    "data/meetings/2025-08-13/markdown/pdf-segments/L02-0-a-consider-the-following-re-request-from-mianus-ri.pdf",
-    "data/meetings/2025-08-13/markdown/pdf-segments/L02-0-a-consider-receipt-of-application-from-united-hard.pdf",
-    "data/meetings/2025-08-13/markdown/pdf-segments/L02-0-a-consider-authorization-for-the-supervisor-to-sig.pdf",
-    "data/meetings/2025-08-13/markdown/pdf-segments/L02-0-a-approval-of-town-board-minutes-july-23-2025.pdf",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--02-A-Consider-the-following-Re-request-from.md",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--01-B-Administrator-Update.md",
-    "data/meetings/2025-08-13/markdown/metadata.json",
-    "data/meetings/2025-08-13/markdown/index.md",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--18-D-Release-of-Highway-Bonds.md",
-    "data/meetings/2025-08-13/markdown/pdf-segments/L02-4-d-release-of-highway-bonds.pdf",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--17-C-Receipt-of-Notice-of-Public-Improvemen.md",
-    "data/meetings/2025-08-13/markdown/pdf-segments/L02-2-c-receipt-of-notice-of-public-improvement-lien-re-.pdf",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--16-D-Receipt-of-letter-of-resignation-from-.md",
-    "data/meetings/2025-08-13/markdown/pdf-segments/L02-3-d-receipt-of-letter-of-resignation-from-judy-kitt-.pdf",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--15-C-Consider-authorization-for-the-Supervi.md",
-    "data/meetings/2025-08-13/markdown/pdf-segments/L02-4-c-consider-authorization-for-the-supervisor-to-sig.pdf",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--14-B-Consider-the-following-Re-Trust-for-Pu.md",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--13-A-Consider-authorization-for-the-Supervi.md",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--12-I-Receipt-of-Consent-Judgment-and-author.md",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--11-H-Consider-adoption-of-the-Towns-revised.md",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--10-G-Consider-adoption-of-the-Towns-revised.md",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--09-F-Consider-approval-of-alcohol-permit-ap.md",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--08-E-Consider-receipt-of-memo-from-Highway-.md",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--07-D-Consider-receipt-of-memo-from-Director.md",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--06-C-Consider-receipt-of-letter-from-the-Bo.md",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--05-B-Consider-receipt-of-a-Local-Law-to-ame.md",
+    "prompts/README.md",
+    "src/agents/base_agent.py.tmp.81371.1754883548741",
+    "prompts/agents/meeting_analysis.md",
+    "prompts/agents",
+    "prompts",
+    "data/meetings/2025-08-13/analysis/agenda_analysis.json",
+    "data/meetings/2025-08-13/analysis/meeting_summary.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_23_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_18d_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_17c_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_16d_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_15c_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_14b_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_13a_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_12i_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_11h_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_10g_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_09f_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_08e_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_07d_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_06c_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_05b_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_04a_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_02a_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items/item_01b_analysis.md",
+    "data/meetings/2025-08-13/analysis/agenda_items",
+    "data/meetings/2025-08-13/analysis",
+    "src/agents/__pycache__/meeting_analysis_agent.cpython-313.pyc",
+    "config/config.yaml.tmp.81371.1754879506789",
+    "src/agents/meeting_analysis_agent.py",
+    "src/agents/__pycache__/meeting_expert_agent.cpython-313.pyc",
+    "AI_TOWN_BOARD_PREP_SPEC_UPDATED.md",
     "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--04-A-Consider-receipt-of-application-from-U.md",
     "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--03-A-Approval-of-Town-Board-Minutes-July-23.md",
-    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--01-Complete-Agenda.md",
-    "data/town-code/markdown/chapters/L01-270-trees.md",
-    "data/town-code/markdown/chapters/L01-276-wetlands-and-watercourse-protection.md",
-    "data/town-code/markdown/chapters/L01-84-electrical-installations.md",
-    "data/town-code/markdown/chapters/L01-39-police-department.md",
-    "data/town-code/markdown/chapters/L01-13-boards-bureaus-and-committees.md"
+    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--02-A-Consider-the-following-Re-request-from.md",
+    "data/meetings/2025-08-13/markdown/2025-08-13-Town-Board-Meeting--01-B-Administrator-Update.md"
   ]
 }

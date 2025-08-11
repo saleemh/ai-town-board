@@ -8,14 +8,47 @@ document_processing:
     output_format: "markdown"
     batch_size: 5
     
+# Agent Configuration
 agents:
-  town_attorney:
+  meeting_expert:
     enabled: true
-    llm_provider: "openai"  # or "anthropic"
+    llm_provider: "fallback"                 # Use fallback mode for testing without API key
+    model: "gpt-5"                           # Primary model for meeting analysis
+    temperature: 0.2                         # Low temperature for factual responses
+    max_tokens: 3000                         # Allow longer responses for comprehensive answers
+    knowledge_sources: ["meeting"]            # Uses meeting corpus
+    response_format: "markdown"              # Format responses in markdown
+    citation_required: true                  # Always include citations
+    max_evidence_items: 8                   # Max evidence pieces to consider
+    confidence_threshold: 0.6               # Minimum confidence to respond
+    api_key_env: "OPENAI_API_KEY"           # Environment variable name for API key
+    
+  meeting_analysis:
+    enabled: true
+    llm_provider: "fallback"                 # Use fallback mode for testing without API key
+    model: "gpt-5"                           # Primary model for meeting analysis
+    temperature: 0.1                         # Very low temperature for consistent analysis
+    max_tokens: 2000                         # Sufficient for structured analysis sections
+    knowledge_sources: ["meeting"]            # Uses meeting corpus
+    response_format: "structured"            # Structured analysis format
+    citation_required: false                 # Analysis doesn't need citations
+    api_key_env: "OPENAI_API_KEY"           # Environment variable name for API key
+    prompt_file: "prompts/agents/meeting_analysis.md"  # External prompt file
+    # Optional LLM client configuration:
+    # base_url: "https://api.openai.com/v1"  # Custom API endpoint
+    # organization: "org-xxxxxxxxx"          # OpenAI organization ID  
+    # timeout: 30                            # Request timeout in seconds
+    
+  town_attorney:
+    enabled: false                          # Disabled until implemented
+    llm_provider: "openai"
     model: "gpt-5"
     temperature: 0.1
     max_tokens: 2000
-    api_key_env: "OPENAI_API_KEY"  # Environment variable name for API key
+    knowledge_sources: ["town_code", "meeting"]
+    require_citations: true
+    fail_on_missing_citations: true
+    api_key_env: "OPENAI_API_KEY"
     
   # Alternative Anthropic configuration
   # town_attorney:
@@ -37,8 +70,30 @@ api:
     api_key_env: "ANTHROPIC_API_KEY"  # Set this environment variable with your Anthropic API key
     base_url: null  # Use default Anthropic endpoint
     
+# Knowledge Provider Configuration  
+knowledge:
+  meeting_corpus:
+    chunk_size: 1000                        # Document chunk size for search
+    chunk_overlap: 200                      # Overlap between chunks
+    enable_semantic_search: false          # Disable for now (no embeddings yet)
+    enable_keyword_search: true            # Use keyword-based search
+    rerank_results: true                   # Rerank combined results
+    
+  embeddings:
+    provider: "openai"                     # or "local" 
+    model: "text-embedding-3-large"       # Embedding model (for future use)
+    dimension: 3072                        # Embedding dimension
+    batch_size: 100                       # Batch size for embedding
+
+# Storage Configuration with Configurable Paths
 storage:
-  data_directory: "./data"
+  data_directory: "./data"                 # Base data directory
+  meetings_root: "data/meetings"           # Default meetings location
+  town_code_dir: "data/town-code/markdown" # Default town code location
+  meeting_locator:
+    mode: "explicit"                      # "explicit" | "by_date"  
+    date_pattern: "{YYYY-MM-DD}-{type}"    # Used only if mode == "by_date"
+    metadata_filename: "metadata.json"    # Meeting metadata file
   backup_enabled: true
   retention_policy: "2_years"
   
